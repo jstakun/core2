@@ -49,11 +49,11 @@ def getBatteryLevel():
 def isOlderThan(date_str, mins): 
   the_date = getDateTuple(date_str)
   #TODO check TIMEZONE and add correct number of hours
-  seconds = utime.mktime(the_date) #UTC+1
+  the_date_seconds = utime.mktime(the_date) #UTC+1
   #UTC
   now = utime.mktime((rtc.datetime()[0],rtc.datetime()[1],rtc.datetime()[2],rtc.datetime()[4],rtc.datetime()[5],rtc.datetime()[6],0,0))
   #print(str(the_date) + ":" + str(seconds) + " " + str(rtc.datetime()) + ":" + str(now))
-  diff = (now - seconds + 3600)
+  diff = (now - the_date_seconds + 3600)
   printTime(diff, prefix='Entry read', suffix='ago')
   return diff > (60 * mins)   
 
@@ -90,13 +90,15 @@ def checkBeeper():
   global USE_BEEPER, BEEPER_START_TIME, BEEPER_END_TIME 
   try:   
     if USE_BEEPER == 1:
+      #TODO add to tm timezone
       d = utime.localtime(0)
-      tm = rtc.datetime() #utime.localtime(utime.time())
+      #UTC
+      now = rtc.datetime() #utime.localtime(utime.time())
     
       c = list(d)
-      c[3] = tm[4]
-      c[4] = tm[5]
-      c[5] = tm[6]
+      c[3] = now[4]
+      c[4] = now[5]
+      c[5] = now[6]
 
       d1 = list(d)
       [HH, MM, SS] = [int(i) for i in BEEPER_START_TIME.split(':')]
@@ -323,6 +325,7 @@ def printScreen(clear=False, expiredData=False):
     lcd.font(lcd.FONT_DejaVu72)
     w = lcd.textWidth(sgvStr)
     x = (int)(320 - (320 - w - 20 - 80) / 2)
+    if x > 275: x = 275
     y = 120 + 36
     printText(sgvStr, x, y, "888", font=lcd.FONT_DejaVu72, backgroundColor=backgroundColor, rotate=180)
     
@@ -347,7 +350,7 @@ def printScreen(clear=False, expiredData=False):
 
     #sgv diff
     w = lcd.textWidth(sgvDiffStr)
-    x = (int)((320-w)/2)
+    x = (int)(w+(320-w)/2)
     printText(sgvDiffStr, x, 222, "888", font=lcd.FONT_DejaVu18, backgroundColor=backgroundColor, rotate=180)
 
     #dateStr
@@ -503,6 +506,7 @@ try:
   if len(API_ENDPOINT)==0: raise Exception("Empty api-endpoint parameter")
   if len(WIFI)==0: raise Exception("Empty wifi parameter") 
   if USE_BEEPER != 1 and USE_BEEPER != 0: USE_BEEPER=1
+  #TODO add TIMEZONE validation format GMT+/-10
 
   mpu = IMU()
   mode = 0
