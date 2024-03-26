@@ -16,6 +16,7 @@ import utime
 import unit
 from collections import OrderedDict
 from imu import IMU
+import re
 
 EMERGENCY_PAUSE_INTERVAL = 1800  #sec = 30 mins
 MODES = ["full_elapsed", "full_date", "full_battery", "basic", "flip_full_elapsed", "flip_full_date", "flip_full_battery", "chart", "flip_chart"]
@@ -47,13 +48,13 @@ def getBatteryLevel():
   if volt >= 4.20: return 101
 
 def isOlderThan(date_str, mins): 
+  global secondsDiff
   the_date = getDateTuple(date_str)
   the_date_seconds = utime.mktime(the_date) 
-  #TODO check TIMEZONE and add correct number of hours
   now = utime.mktime((rtc.datetime()[0],rtc.datetime()[1],rtc.datetime()[2],
                       rtc.datetime()[4],rtc.datetime()[5],rtc.datetime()[6],0,0)) #UTC
   #print(str(the_date) + ":" + str(seconds) + " " + str(rtc.datetime()) + ":" + str(now))
-  diff = (now - the_date_seconds + 3600)
+  diff = (now - the_date_seconds + secondsDiff)
   printTime(diff, prefix='Entry read', suffix='ago')
   return diff > (60 * mins)   
 
@@ -87,17 +88,18 @@ def readSgvFile():
   return d 
 
 def checkBeeper():
-  global USE_BEEPER, BEEPER_START_TIME, BEEPER_END_TIME 
+  global USE_BEEPER, BEEPER_START_TIME, BEEPER_END_TIME, secondsDiff 
   try:   
     if USE_BEEPER == 1:
       d = utime.localtime(0)
-      #TODO check TIMEZONE and add correct number of hours
-      now = rtc.datetime() #UTC
-    
+      now = utime.mktime((rtc.datetime()[0],rtc.datetime()[1],rtc.datetime()[2],
+                          rtc.datetime()[4],rtc.datetime()[5],rtc.datetime()[6],0,0))
+      localtime = utime.localtime(now + secondsDiff)
+      
       c = list(d)
-      c[3] = now[4]
-      c[4] = now[5]
-      c[5] = now[6]
+      c[3] = localtime[3]
+      c[4] = localtime[4]
+      c[5] = localtime[5]
 
       d1 = list(d)
       [HH, MM, SS] = [int(i) for i in BEEPER_START_TIME.split(':')]
@@ -178,7 +180,7 @@ def drawTriangle(centerX, centerY, arrowColor, rotateAngle=90, width=44, height=
   return x1r, y1r, x2r, y2r, x3r, y3r 
 
 def printScreen(clear=False, expiredData=False):
-  global response, mode, brightness, emergency, emergencyPause, MIN, MAX, EMERGENCY_MIN, EMERGENCY_MAX, currentBackgroudColor, screenDrawing, startTime, rgbUnit
+  global response, mode, brightness, emergency, emergencyPause, MIN, MAX, EMERGENCY_MIN, EMERGENCY_MAX, currentBackgroudColor, screenDrawing, startTime, rgbUnit, secondsDiff
   #320*240
 
   print('Printing screen in ' + MODES[mode] + ' mode')
@@ -249,13 +251,16 @@ def printScreen(clear=False, expiredData=False):
   else:
      print("Skip background clearing")
 
-  #TODO check TIMEZONE and add correct number of hours
-  h = str(rtc.datetime()[4])
-  if (rtc.datetime()[4] < 10): h = "0" + h   
-  m = str(rtc.datetime()[5])
-  if (rtc.datetime()[5] < 10): m = "0" + m
-  #s = str(rtc.datetime()[6])
-  #if (rtc.datetime()[6] < 10): s = "0" + s
+  now = utime.mktime((rtc.datetime()[0],rtc.datetime()[1],rtc.datetime()[2],
+                      rtc.datetime()[4],rtc.datetime()[5],rtc.datetime()[6],0,0))
+  localtime = utime.localtime(now + secondsDiff)
+
+  h = str(localtime[3])
+  if (localtime[3] < 10): h = "0" + h   
+  m = str(localtime[4])
+  if (localtime[4] < 10): m = "0" + m
+  #s = str(localtime[5])
+  #if (localtime[5] < 10): s = "0" + s
   timeStr = h + ":" + m
 
   if not tooOld and directionStr == 'DoubleUp' and sgv+20>=MAX: arrowColor = lcd.RED
@@ -469,13 +474,13 @@ def onBtnPressed():
 # ------------------------------------------------------------------------------     
 
 print('Starting...')
-print('APIKEY: ' + deviceCfg.get_apikey())
+print('APIKEY:',deviceCfg.get_apikey())
 macaddr=wifiCfg.wlan_sta.config('mac')
 macaddr='{:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}'.format(*macaddr)
-print('MAC Adddress: ' + macaddr)
-print('Free memory: ' + str(gc.mem_free()) + ' bytes')
+print('MAC Adddress:', macaddr)
+print('Free memory:', str(gc.mem_free()) + ' bytes')
 machine_id = binascii.hexlify(machine.unique_id())
-print('Machine unique id: ' + machine_id.decode())
+print('Machine unique id:', machine_id.decode())
 
 response = '{}'
 brightness = 32
@@ -513,16 +518,22 @@ try:
   if len(API_ENDPOINT)==0: raise Exception("Empty api-endpoint parameter")
   if len(WIFI)==0: raise Exception("Empty wifi parameter") 
   if USE_BEEPER != 1 and USE_BEEPER != 0: USE_BEEPER=1
-  #TODO add TIMEZONE validation format GMT+/-10
+  if re.search("^GMT[+-]((0?[0-9]|1[0-1]):([0-5][0-9])|12:00)$",TIMEZONE)==None: TIMEZONE="GMT+0:00"
+
+  timeStr = TIMEZONE[4:]
+  [HH, MM] = [int(i) for i in timeStr.split(':')]
+  secondsDiff = HH * 3600 + MM * 60
+  if TIMEZONE[3] == "-": secondsDiff = secondsDiff * -1
+  print('Local time seconds difference:', secondsDiff) 
 
   mpu = IMU()
   mode = 0
   if mpu.acceleration[1] < 0: mode = 4 #flip
 
-  lcd.clear(lcd.DARKGREY)
-
   rgbUnit = unit.get(unit.RGB, unit.PORTA)
   rgbUnit.setColor(2, lcd.DARKGREY)
+
+  lcd.clear(lcd.DARKGREY)
 except Exception as e:
   sys.print_exception(e)
   while True:
