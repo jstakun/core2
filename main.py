@@ -13,7 +13,7 @@ import ubinascii
 import urequests
 import _thread
 import utime
-from machine import Pin, PWM
+import unit
 from collections import OrderedDict
 from imu import IMU
 
@@ -48,10 +48,10 @@ def getBatteryLevel():
 
 def isOlderThan(date_str, mins): 
   the_date = getDateTuple(date_str)
+  the_date_seconds = utime.mktime(the_date) 
   #TODO check TIMEZONE and add correct number of hours
-  the_date_seconds = utime.mktime(the_date) #UTC+1
-  #UTC
-  now = utime.mktime((rtc.datetime()[0],rtc.datetime()[1],rtc.datetime()[2],rtc.datetime()[4],rtc.datetime()[5],rtc.datetime()[6],0,0))
+  now = utime.mktime((rtc.datetime()[0],rtc.datetime()[1],rtc.datetime()[2],
+                      rtc.datetime()[4],rtc.datetime()[5],rtc.datetime()[6],0,0)) #UTC
   #print(str(the_date) + ":" + str(seconds) + " " + str(rtc.datetime()) + ":" + str(now))
   diff = (now - the_date_seconds + 3600)
   printTime(diff, prefix='Entry read', suffix='ago')
@@ -90,10 +90,9 @@ def checkBeeper():
   global USE_BEEPER, BEEPER_START_TIME, BEEPER_END_TIME 
   try:   
     if USE_BEEPER == 1:
-      #TODO add to tm timezone
       d = utime.localtime(0)
-      #UTC
-      now = rtc.datetime() #utime.localtime(utime.time())
+      #TODO check TIMEZONE and add correct number of hours
+      now = rtc.datetime() #UTC
     
       c = list(d)
       c[3] = now[4]
@@ -179,7 +178,7 @@ def drawTriangle(centerX, centerY, arrowColor, rotateAngle=90, width=44, height=
   return x1r, y1r, x2r, y2r, x3r, y3r 
 
 def printScreen(clear=False, expiredData=False):
-  global response, mode, brightness, emergency, emergencyPause, MIN, MAX, EMERGENCY_MIN, EMERGENCY_MAX, currentBackgroudColor, screenDrawing, startTime
+  global response, mode, brightness, emergency, emergencyPause, MIN, MAX, EMERGENCY_MIN, EMERGENCY_MAX, currentBackgroudColor, screenDrawing, startTime, rgbUnit
   #320*240
 
   print('Printing screen in ' + MODES[mode] + ' mode')
@@ -207,19 +206,16 @@ def printScreen(clear=False, expiredData=False):
    except Exception as e:
      sys.print_exception(e)
   
-  led = 0
-  if tooOld: backgroundColor=lcd.DARKGREY; led = 1; emergency=False
-  elif sgv <= EMERGENCY_MIN: backgroundColor=lcd.RED; led = 1; emergency=(utime.time() > emergencyPause and not tooOld)  
-  elif sgv >= (MIN-10) and sgv < MIN and directionStr.endswith("Up"): backgroundColor=lcd.DARKGREEN; emergency=False; led = 0
-  elif sgv > EMERGENCY_MIN and sgv <= MIN: backgroundColor=lcd.RED; led = 1; emergency=False
-  elif sgv > MIN and sgv <= MAX: backgroundColor=lcd.DARKGREEN; emergency=False; led = 0 
-  elif sgv > MAX and sgv <= (MAX+10) and directionStr.endswith("Down"): backgroundColor=lcd.DARKGREEN; emergency=False; led = 0
-  elif sgv > MAX and sgv <= EMERGENCY_MAX: backgroundColor=lcd.ORANGE; led = 1; emergency=False
-  elif sgv > EMERGENCY_MAX: backgroundColor=lcd.ORANGE; led = 1; emergency=(utime.time() > emergencyPause and not tooOld)  
+  if tooOld: backgroundColor=lcd.DARKGREY; emergency=False
+  elif sgv <= EMERGENCY_MIN: backgroundColor=lcd.RED; emergency=(utime.time() > emergencyPause and not tooOld)  
+  elif sgv >= (MIN-10) and sgv < MIN and directionStr.endswith("Up"): backgroundColor=lcd.DARKGREEN; emergency=False
+  elif sgv > EMERGENCY_MIN and sgv <= MIN: backgroundColor=lcd.RED; emergency=False
+  elif sgv > MIN and sgv <= MAX: backgroundColor=lcd.DARKGREEN; emergency=False 
+  elif sgv > MAX and sgv <= (MAX+10) and directionStr.endswith("Down"): backgroundColor=lcd.DARKGREEN; emergency=False
+  elif sgv > MAX and sgv <= EMERGENCY_MAX: backgroundColor=lcd.ORANGE; emergency=False
+  elif sgv > EMERGENCY_MAX: backgroundColor=lcd.ORANGE; emergency=(utime.time() > emergencyPause and not tooOld)  
 
-  ledDevice = M5Led()
-  if led == 1: ledDevice.set_on()
-  else: ledDevice.set_off()
+  rgbUnit.setColor(2, backgroundColor)
   
   #if emergency change to one of full modes 
   currentMode = mode
@@ -251,6 +247,7 @@ def printScreen(clear=False, expiredData=False):
   else:
      print("Skip background clearing")
 
+  #TODO check TIMEZONE and add correct number of hours
   h = str(rtc.datetime()[4])
   if (rtc.datetime()[4] < 10): h = "0" + h   
   m = str(rtc.datetime()[5])
@@ -341,6 +338,8 @@ def printScreen(clear=False, expiredData=False):
     elif directionStr == 'FortyFiveUp': printDirection(x, y, xshift=-4, yshift=4, rotateAngle=135, arrowColor=arrowColor)
     elif directionStr == 'FortyFiveDown': printDirection(x, y, xshift=-4, yshift=-4, rotateAngle=-135, arrowColor=arrowColor)
 
+    lcd.fillRect(0, 360-50, 360, 50, backgroundColor)
+    
     #current time
     printText(timeStr, 307, 222, "88888", font=lcd.FONT_DejaVu18, backgroundColor=backgroundColor, rotate=180)  
   
@@ -412,7 +411,7 @@ def backendMonitor():
       time.sleep(backendRetry)
 
 def emergencyMonitor():
-  global emergency, response
+  global emergency, response, rgbUnit
   while True:
     #print('Emergency monitor checking status')
     useBeeper = checkBeeper()
@@ -422,14 +421,13 @@ def emergencyMonitor():
         print('Low battery level ' + str(batteryLevel) + "%!!!")
       else:
         print('Emergency glucose level ' + str(response[0]['sgv']) + '!!!')
-      ledDevice = M5Led()
-      ledDevice.set_on()
-      if useBeeper == True:
-        speaker.playTone(523, 2, volume=2)
+      rgbUnit.setColor(2, lcd.RED)
+      #if useBeeper == True:
+      #  speaker.playTone(523, 2, volume=2)
       time.sleep(0.5)
-      ledDevice.set_off()
-      if useBeeper == True:
-        speaker.playTone(523, 2, volume=2)
+      rgbUnit.setColor(2, lcd.BLACK)
+      #if useBeeper == True:
+      #  speaker.playTone(523, 2, volume=2)
       time.sleep(0.5)
     else:
       #print('No emergency')
@@ -513,6 +511,9 @@ try:
   if mpu.acceleration[1] < 0: mode = 4 #flip
 
   lcd.clear(lcd.DARKGREY)
+
+  rgbUnit = unit.get(unit.RGB, unit.PORTA)
+  rgbUnit.setColor(2, lcd.DARKGREY)
 except Exception as e:
   sys.print_exception(e)
   while True:
