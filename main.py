@@ -215,7 +215,9 @@ def printScreen(clear=False, expiredData=False):
   elif sgv > MAX and sgv <= EMERGENCY_MAX: backgroundColor=lcd.ORANGE; emergency=False
   elif sgv > EMERGENCY_MAX: backgroundColor=lcd.ORANGE; emergency=(utime.time() > emergencyPause and not tooOld)  
 
+  rgbUnit.setColor(1, lcd.BLACK)
   rgbUnit.setColor(2, backgroundColor)
+  rgbUnit.setColor(3, lcd.BLACK)
   
   #if emergency change to one of full modes 
   currentMode = mode
@@ -421,11 +423,18 @@ def emergencyMonitor():
         print('Low battery level ' + str(batteryLevel) + "%!!!")
       else:
         print('Emergency glucose level ' + str(response[0]['sgv']) + '!!!')
+      rgbUnit.setColor(1, lcd.BLACK)
       rgbUnit.setColor(2, lcd.RED)
       #if useBeeper == True:
       #  speaker.playTone(523, 2, volume=2)
       time.sleep(0.5)
       rgbUnit.setColor(2, lcd.BLACK)
+      rgbUnit.setColor(3, lcd.RED)
+      #if useBeeper == True:
+      #  speaker.playTone(523, 2, volume=2)
+      time.sleep(0.5)
+      rgbUnit.setColor(3, lcd.BLACK)
+      rgbUnit.setColor(1, lcd.RED)
       #if useBeeper == True:
       #  speaker.playTone(523, 2, volume=2)
       time.sleep(0.5)
