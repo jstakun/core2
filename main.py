@@ -228,7 +228,7 @@ def printScreen(clear=False, expiredData=False):
   #battery level emergency
   batteryLevel = getBatteryLevel()
   uptime = utime.time() - startTime  
-  if (batteryLevel < 20 and batteryLevel > 0 and uptime > 300) and (utime.time() > emergencyPause) and not axp.getChargeState(): 
+  if (batteryLevel < 20 and batteryLevel > 0 and uptime > 300) and (utime.time() > emergencyPause) and not power.getChargeState(): 
     emergency = True
     if currentMode < 4 or currentMode == 7: currentMode = 2
     else: currentMode = 6
@@ -419,6 +419,8 @@ def backendMonitor():
 
 def emergencyMonitor():
   global emergency, response, rgbUnit
+  vibrate = False
+  intensity = 0
   while True:
     #print('Emergency monitor checking status')
     useBeeper = checkBeeper()
@@ -430,20 +432,37 @@ def emergencyMonitor():
         print('Emergency glucose level ' + str(response[0]['sgv']) + '!!!')
       rgbUnit.setColor(1, lcd.BLACK)
       rgbUnit.setColor(2, lcd.RED)
-      #if useBeeper == True:
-      #  speaker.playTone(523, 2, volume=2)
+      if useBeeper == True:
+        #speaker.playTone(523, 2, volume=2)
+        vibrate = not vibrate
+        intensity += 1
+        if intensity > 100: intensity = 0
+        power.setVibrationEnable(vibrate) 
+        power.setVibrationIntensity(intensity)   
       time.sleep(0.5)
       rgbUnit.setColor(2, lcd.BLACK)
       rgbUnit.setColor(3, lcd.RED)
-      #if useBeeper == True:
-      #  speaker.playTone(523, 2, volume=2)
+      if useBeeper == True:
+        #speaker.playTone(523, 2, volume=2)
+        vibrate = not vibrate
+        intensity += 1
+        if intensity > 100: intensity = 0
+        power.setVibrationEnable(vibrate) 
+        power.setVibrationIntensity(intensity)  
       time.sleep(0.5)
       rgbUnit.setColor(3, lcd.BLACK)
       rgbUnit.setColor(1, lcd.RED)
-      #if useBeeper == True:
-      #  speaker.playTone(523, 2, volume=2)
+      if useBeeper == True:
+        #speaker.playTone(523, 2, volume=2)
+        vibrate = not vibrate
+        intensity += 1
+        if intensity > 100: intensity = 0
+        power.setVibrationEnable(vibrate) 
+        power.setVibrationIntensity(intensity)  
       time.sleep(0.5)
     else:
+      vibrate = False
+      intensity = 0  
       #print('No emergency')
       time.sleep(2)
 
@@ -524,7 +543,7 @@ try:
   [HH, MM] = [int(i) for i in timeStr.split(':')]
   secondsDiff = HH * 3600 + MM * 60
   if TIMEZONE[3] == "-": secondsDiff = secondsDiff * -1
-  print('Local time seconds difference:', secondsDiff) 
+  print('Local time seconds diff from UTC:', secondsDiff) 
 
   mpu = IMU()
   mode = 0
