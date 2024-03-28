@@ -323,8 +323,9 @@ def printScreen(clear=False, expiredData=False):
   
   elif currentMode in range(4,7):
     #flip mode
-    lcd.fillRect(0, 34, 360, 180, backgroundColor)   
-
+    lcd.fillRect(0, 0, 360, 40, lcd.DARKGREY)
+    lcd.fillRect(0, 40, 360, 200, backgroundColor)   
+    
     #sgv 
     lcd.font(lcd.FONT_DejaVu72)
     w = lcd.textWidth(sgvStr)
@@ -364,7 +365,6 @@ def printScreen(clear=False, expiredData=False):
     w = lcd.textWidth(dateStr)
     x = (int)(320-(320-w)/2)
     y = 24 + 5
-    lcd.fillRect(0, 0, 360, 38, lcd.DARKGREY)
     printText(dateStr, x, y, "8888888888888", font=lcd.FONT_DejaVu24, backgroundColor=lcd.DARKGREY, rotate=180)  
 
   print("----------------------------")
