@@ -201,12 +201,13 @@ def printScreen(clear=False, expiredData=False):
 
   directionStr = newest['direction']
   
-  tooOld = expiredData
+  tooOld = expiredData and isOlderThan(newest['date'], 10)
   if tooOld == False:
    try:
      tooOld = isOlderThan(newest['date'], 30)
    except Exception as e:
      sys.print_exception(e)
+  print('Is too old?', tooOld)  
   
   if tooOld: backgroundColor=lcd.DARKGREY; emergency=False
   elif sgv <= EMERGENCY_MIN: backgroundColor=lcd.RED; emergency=(utime.time() > emergencyPause and not tooOld)  
@@ -277,7 +278,7 @@ def printScreen(clear=False, expiredData=False):
   #if sgvDiff < 10 and sgvDiff > -10: sgvDiffStr = "  " + sgvDiffStr
   
   #draw screen
-  
+
   if currentMode in range (0,3):  
 
     lcd.fillRect(0, 0, 360, 180, backgroundColor)   
@@ -323,7 +324,6 @@ def printScreen(clear=False, expiredData=False):
   
   elif currentMode in range(4,7):
     #flip mode
-    lcd.fillRect(0, 0, 360, 40, lcd.DARKGREY)
     lcd.fillRect(0, 40, 360, 200, backgroundColor)   
     
     #sgv 
@@ -365,6 +365,7 @@ def printScreen(clear=False, expiredData=False):
     w = lcd.textWidth(dateStr)
     x = (int)(320-(320-w)/2)
     y = 24 + 5
+    lcd.fillRect(0, 0, 360, 40, lcd.DARKGREY)
     printText(dateStr, x, y, "8888888888888", font=lcd.FONT_DejaVu24, backgroundColor=lcd.DARKGREY, rotate=180)  
 
   print("----------------------------")
@@ -420,7 +421,7 @@ def backendMonitor():
 def emergencyMonitor():
   global emergency, response, rgbUnit
   vibrate = False
-  intensity = 0
+  intensity = 20
   while True:
     #print('Emergency monitor checking status')
     useBeeper = checkBeeper()
@@ -435,8 +436,8 @@ def emergencyMonitor():
       if useBeeper == True:
         #speaker.playTone(523, 2, volume=2)
         vibrate = not vibrate
-        intensity += 1
-        if intensity > 100: intensity = 0
+        #intensity += 1
+        #if intensity > 100: intensity = 0
         power.setVibrationEnable(vibrate) 
         power.setVibrationIntensity(intensity)   
       time.sleep(0.5)
@@ -445,8 +446,8 @@ def emergencyMonitor():
       if useBeeper == True:
         #speaker.playTone(523, 2, volume=2)
         vibrate = not vibrate
-        intensity += 1
-        if intensity > 100: intensity = 0
+        #intensity += 1
+        #if intensity > 100: intensity = 0
         power.setVibrationEnable(vibrate) 
         power.setVibrationIntensity(intensity)  
       time.sleep(0.5)
@@ -455,14 +456,14 @@ def emergencyMonitor():
       if useBeeper == True:
         #speaker.playTone(523, 2, volume=2)
         vibrate = not vibrate
-        intensity += 1
-        if intensity > 100: intensity = 0
+        #intensity += 1
+        #if intensity > 100: intensity = 0
         power.setVibrationEnable(vibrate) 
         power.setVibrationIntensity(intensity)  
       time.sleep(0.5)
     else:
       vibrate = False
-      intensity = 0  
+      intensity = 20  
       #print('No emergency')
       time.sleep(2)
 
@@ -588,7 +589,7 @@ print("")
 
 printCenteredText("Setting time...", backgroundColor=lcd.DARKGREY) #lcd.GREENYELLOW)
 
-rtc.settime('ntp', host='pool.ntp.org', tzone=1)
+rtc.settime('ntp', host='pool.ntp.org', tzone=0) #UTC
 print("Current UTC datetime " +  str(rtc.datetime()))
 startTime = utime.time()
 
