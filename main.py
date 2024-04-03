@@ -47,21 +47,18 @@ def getBatteryLevel():
   if volt < 4.20: return 100
   if volt >= 4.20: return 101
 
-def isOlderThan(date_str, mins): 
-  global secondsDiff
+def isOlderThan(date_str, mins, now_seconds): 
   the_date = getDateTuple(date_str)
-  the_date_seconds = utime.mktime(the_date) 
-  now = utime.mktime((rtc.datetime()[0],rtc.datetime()[1],rtc.datetime()[2],
-                      rtc.datetime()[4],rtc.datetime()[5],rtc.datetime()[6],0,0)) #UTC
-  #print(str(the_date) + ":" + str(seconds) + " " + str(rtc.datetime()) + ":" + str(now))
-  diff = (now - the_date_seconds + secondsDiff)
+  the_date_seconds = utime.mktime(the_date)
+  print("Date: " + str(the_date) + " - " + str(the_date_seconds) + ", Now: " + str(now_seconds))
+  diff = (now_seconds - the_date_seconds)
   printTime(diff, prefix='Entry read', suffix='ago')
   return diff > (60 * mins)   
 
 def getDateTuple(date_str):
   [yyyy, mm, dd] = [int(i) for i in date_str.split('T')[0].split('-')]
   [HH, MM, SS] = [int(i) for i in date_str.split('T')[1].split(':')]
-  return (yyyy, mm, dd, HH, MM, SS, 0, 0, 0)    
+  return (yyyy, mm, dd, HH, MM, SS, 0, 0)    
 
 def printTime(seconds, prefix='', suffix=''):
   m, s = divmod(seconds, 60)
@@ -92,8 +89,9 @@ def checkBeeper():
   try:   
     if USE_BEEPER == 1:
       d = utime.localtime(0)
-      now = utime.mktime((rtc.datetime()[0],rtc.datetime()[1],rtc.datetime()[2],
-                          rtc.datetime()[4],rtc.datetime()[5],rtc.datetime()[6],0,0))
+      now_datetime = rtc.datetime() 
+      now = utime.mktime((now_datetime[0], now_datetime[1], now_datetime[2],
+                          now_datetime[4], now_datetime[5], now_datetime[6],0,0))
       localtime = utime.localtime(now + secondsDiff)
       
       c = list(d)
@@ -201,10 +199,15 @@ def printScreen(clear=False, expiredData=False):
 
   directionStr = newest['direction']
   
-  tooOld = expiredData and isOlderThan(newest['date'], 10)
+  now_datetime = rtc.datetime()
+  now = utime.mktime((now_datetime[0], now_datetime[1], now_datetime[2],
+                          now_datetime[4], now_datetime[5], now_datetime[6],0,0))  + secondsDiff
+  localtime = utime.localtime(now)
+  
+  tooOld = expiredData and isOlderThan(newest['date'], 10, now)
   if tooOld == False:
    try:
-     tooOld = isOlderThan(newest['date'], 30)
+     tooOld = isOlderThan(newest['date'], 30, now)
    except Exception as e:
      sys.print_exception(e)
   print('Is too old?', tooOld)  
@@ -251,10 +254,6 @@ def printScreen(clear=False, expiredData=False):
      currentBackgroudColor = backgroundColor
   else:
      print("Skip background clearing")
-
-  now = utime.mktime((rtc.datetime()[0],rtc.datetime()[1],rtc.datetime()[2],
-                      rtc.datetime()[4],rtc.datetime()[5],rtc.datetime()[6],0,0))
-  localtime = utime.localtime(now + secondsDiff)
 
   h = str(localtime[3])
   if (localtime[3] < 10): h = "0" + h   
@@ -415,7 +414,7 @@ def backendMonitor():
       sys.print_exception(e)
       print('Battery level: ' + str(getBatteryLevel()) + '%')
       print('Network error. Retry in ' + str(backendRetry) + ' sec...')
-      printScreen(expiredData=True)
+      if response != '{}': printScreen(expiredData=True)
       time.sleep(backendRetry)
 
 def emergencyMonitor():
@@ -424,8 +423,8 @@ def emergencyMonitor():
   intensity = 20
   while True:
     #print('Emergency monitor checking status')
-    useBeeper = checkBeeper()
     if emergency == True:
+      useBeeper = checkBeeper()
       batteryLevel = getBatteryLevel()
       if batteryLevel < 20:
         print('Low battery level ' + str(batteryLevel) + "%!!!")
@@ -589,9 +588,17 @@ print("")
 
 printCenteredText("Setting time...", backgroundColor=lcd.DARKGREY) #lcd.GREENYELLOW)
 
-rtc.settime('ntp', host='pool.ntp.org', tzone=0) #UTC
-print("Current UTC datetime " +  str(rtc.datetime()))
-startTime = utime.time()
+try: 
+  rtc.settime('ntp', host='pool.ntp.org', tzone=0) #UTC
+  print("Current UTC datetime " +  str(rtc.datetime()))
+  startTime = utime.time()
+except Exception as e:
+  sys.print_exception(e)
+  while True:
+    printCenteredText("Failed to set time!", backgroundColor=lcd.RED, clear=True)
+    time.sleep(2)
+    printCenteredText("Restart required!", backgroundColor=lcd.RED, clear=True)
+    time.sleep(2)  
 
 printCenteredText("Loading data...", backgroundColor=lcd.DARKGREY) #lcd.DARKGREEN)
 
