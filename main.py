@@ -241,9 +241,8 @@ def printScreen(clear=False, expiredData=False):
   if "ago" in newest and (currentMode == 0 or currentMode == 4): 
     dateStr = newest['ago']
   elif currentMode == 2 or currentMode == 6:
-    batteryLevel = getBatteryLevel()
     if batteryLevel >= 0:
-       dateStr = "Battery: " + str(getBatteryLevel()) + "%"
+       dateStr = "Battery: " + str(batteryLevel) + "%"
     else: 
        dateStr = "Battery level unknown"
   else:   
@@ -269,12 +268,11 @@ def printScreen(clear=False, expiredData=False):
   elif not tooOld and directionStr == 'SingleDown' and sgv-10<=MIN: arrowColor = lcd.ORANGE
   else: arrowColor = backgroundColor  
 
-  batteryStr = str(getBatteryLevel()) + '%'
+  batteryStr = str(batteryLevel) + '%'
 
   sgvDiff = sgv-response[1]['sgv']
   sgvDiffStr = str(sgvDiff)
   if sgvDiff > 0: sgvDiffStr = "+" + sgvDiffStr
-  #if sgvDiff < 10 and sgvDiff > -10: sgvDiffStr = "  " + sgvDiffStr
   
   #draw screen
 
@@ -305,13 +303,17 @@ def printScreen(clear=False, expiredData=False):
     printText(timeStr, 10, 10, "88888", font=lcd.FONT_DejaVu18, backgroundColor=backgroundColor)  
   
     #battery
+    textColor = lcd.WHITE
+    if batteryLevel < 20 and backgroundColor != lcd.RED: textColor = lcd.RED
     w = lcd.textWidth(batteryStr)
-    printText(batteryStr, (int)(320-5-w), 10, "88888", font=lcd.FONT_DejaVu18, backgroundColor=backgroundColor) 
+    printText(batteryStr, (int)(320-5-w), 10, "88888", font=lcd.FONT_DejaVu18, backgroundColor=backgroundColor, textColor=textColor) 
 
     #sgv diff
+    textColor = lcd.WHITE
+    if math.fabs(sgvDiff) >= 10 and backgroundColor != lcd.RED: textColor = lcd.RED
     w = lcd.textWidth(sgvDiffStr)
     x = (int)((320-w)/2)
-    printText(sgvDiffStr, x, 10, "888", font=lcd.FONT_DejaVu18, backgroundColor=backgroundColor)
+    printText(sgvDiffStr, x, 10, "888", font=lcd.FONT_DejaVu18, backgroundColor=backgroundColor, textColor=textColor)
   
     #dateStr
     lcd.font(lcd.FONT_DejaVu24)
@@ -351,13 +353,17 @@ def printScreen(clear=False, expiredData=False):
     printText(timeStr, 307, 222, "88888", font=lcd.FONT_DejaVu18, backgroundColor=backgroundColor, rotate=180)  
   
     #battery
+    textColor = lcd.WHITE
+    if batteryLevel < 20 and backgroundColor != lcd.RED: textColor = lcd.RED
     w = lcd.textWidth(batteryStr)
-    printText(batteryStr, (int)(w+5), 222, "88888", font=lcd.FONT_DejaVu18, backgroundColor=backgroundColor, rotate=180) 
+    printText(batteryStr, (int)(w+5), 222, "88888", font=lcd.FONT_DejaVu18, backgroundColor=backgroundColor, rotate=180, textColor=textColor) 
 
     #sgv diff
+    textColor = lcd.WHITE
+    if math.fabs(sgvDiff) >= 10 and backgroundColor != lcd.RED: textColor = lcd.RED
     w = lcd.textWidth(sgvDiffStr)
     x = (int)(w+(320-w)/2)
-    printText(sgvDiffStr, x, 222, "888", font=lcd.FONT_DejaVu18, backgroundColor=backgroundColor, rotate=180)
+    printText(sgvDiffStr, x, 222, "888", font=lcd.FONT_DejaVu18, backgroundColor=backgroundColor, rotate=180, textColor=textColor)
 
     #dateStr
     lcd.font(lcd.FONT_DejaVu24)
