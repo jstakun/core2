@@ -495,7 +495,7 @@ def touchPadMonitor():
             ty = t[1]
             print("Touch screen pressed at " + str(tx) + "," + str(ty))
             onBtnPressed()
-        time.sleep(0.1)       
+        time.sleep(0.05)       
 
 def onBtnPressed():
   global emergency, emergencyPause
@@ -630,6 +630,7 @@ print('Loaded ' + str(dictLen) + " sgv entries")
 _thread.start_new_thread(backendMonitor, ())
 _thread.start_new_thread(emergencyMonitor, ())
 _thread.start_new_thread(mpuMonitor, ())
+#_thread.start_new_thread(touchPadMonitor, ())
 
 btnA.wasPressed(onBtnPressed)
 btnB.wasPressed(onBtnPressed)
