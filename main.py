@@ -124,14 +124,23 @@ def checkBeeper():
     return True   
 
 def printCenteredText(msg, font=lcd.FONT_DejaVu24, backgroundColor=lcd.BLACK, textColor=lcd.WHITE, clear=False):
-  lcd.font(font)
+  global mode
+  rotate = 0
+  if mode >= 4: 
+    rotate = 180
+  lcd.font(font, rotate=rotate)
   if clear == True:
-     lcd.clear(backgroundColor)
+    lcd.clear(backgroundColor)
   lcd.setTextColor(textColor)
   w = lcd.textWidth(msg)
   f = lcd.fontSize()
+  x = (int)((320-w)/2)
+  y = (int)((240-f[1])/2)
+  if rotate == 180:
+    x = (int)(160+(w/2))
+    y = (int)(120+(f[1]/2))
   lcd.fillRect(0, (int)(120-f[1]/2), 320, (int)(f[1]), backgroundColor)
-  lcd.print(msg, (int)((320-w)/2), (int)((240-f[1])/2))
+  lcd.print(msg, x, y)
 
 def printText(msg, x, y, cleanupMsg, font=lcd.FONT_DejaVu24, backgroundColor=lcd.BLACK, textColor=lcd.WHITE, clear=False, rotate=0):
   lcd.font(font, rotate=rotate)
