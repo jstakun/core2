@@ -475,27 +475,23 @@ def emergencyMonitor():
       #print('No emergency')
       time.sleep(2)
 
-def mpuMonitor():
+def mpuCallback(t):
   global mpu, mode, response
-  while True:
-    acceleration = mpu.acceleration
-    hasResponse = (response != '{}')
-    if hasResponse and acceleration[1] < -0.1 and mode in range(0,3): mode += 4; printScreen(clear=True) #change to 'Flip mode' #4,5,6
-    elif hasResponse and acceleration[1] > 0.1 and mode in range(4,7): mode -= 4; printScreen(clear=True) #change to 'Normal mode' #0,1,2
-    elif hasResponse and acceleration[1] < -0.1 and mode == 7: mode = 8; printScreen(clear=True)
-    elif hasResponse and acceleration[1] > 0.1 and mode == 8: mode = 7; printScreen(clear=True)
-    #print("Acc:", str(acceleration))
-    time.sleep(0.5)
+  acceleration = mpu.acceleration
+  hasResponse = (response != '{}')
+  if hasResponse and acceleration[1] < -0.1 and mode in range(0,3): mode += 4; printScreen(clear=True) #change to 'Flip mode' #4,5,6
+  elif hasResponse and acceleration[1] > 0.1 and mode in range(4,7): mode -= 4; printScreen(clear=True) #change to 'Normal mode' #0,1,2
+  elif hasResponse and acceleration[1] < -0.1 and mode == 7: mode = 8; printScreen(clear=True)
+  elif hasResponse and acceleration[1] > 0.1 and mode == 8: mode = 7; printScreen(clear=True)
+  #print("Acc:", str(acceleration))
 
-def touchPadMonitor():
-    while True:
-        if touch.status() == True:
-            t = touch.read()
-            tx = t[0]
-            ty = t[1]
-            print("Touch screen pressed at " + str(tx) + "," + str(ty))
-            onBtnPressed()
-        time.sleep(0.05)       
+def touchPadCallback(t):
+  if touch.status() == True:
+    t = touch.read()
+    tx = t[0]
+    ty = t[1]
+    print("Touch screen pressed at " + str(tx) + "," + str(ty))
+    onBtnPressed()
 
 def onBtnPressed():
   global emergency, emergencyPause
@@ -629,11 +625,13 @@ print('Loaded ' + str(dictLen) + " sgv entries")
 
 _thread.start_new_thread(backendMonitor, ())
 _thread.start_new_thread(emergencyMonitor, ())
-_thread.start_new_thread(mpuMonitor, ())
-#_thread.start_new_thread(touchPadMonitor, ())
 
 btnA.wasPressed(onBtnPressed)
 btnB.wasPressed(onBtnPressed)
 btnC.wasPressed(onBtnPressed)
 
-touchPadMonitor()
+mpuTimer = machine.Timer(1)
+mpuTimer.init(period=500, callback=mpuCallback)
+
+touchPadTimer = machine.Timer(2)
+touchPadTimer.init(period=50, callback=touchPadCallback)
