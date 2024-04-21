@@ -275,9 +275,13 @@ def printScreen(clear=False):
   
   #draw screen
 
+  lcd.fillRect(0, 0, 360, 40, lcd.DARKGREY)
+  lcd.fillRect(0, 40, 360, 160, backgroundColor) 
+  lcd.fillRect(0, 200, 360, 40, lcd.DARKGREY)
+
   if currentMode in range (0,3):  
 
-    lcd.fillRect(0, 0, 360, 180, backgroundColor)   
+    #lcd.fillRect(0, 0, 360, 180, backgroundColor)   
 
     #sgv 
     lcd.font(lcd.FONT_DejaVu72)
@@ -319,12 +323,12 @@ def printScreen(clear=False):
     w = lcd.textWidth(dateStr)
     x = (int)((320-w)/2)
     y = 240-24-5
-    lcd.fillRect(0, y-5, 360, 46, lcd.DARKGREY)
+    #lcd.fillRect(0, y-5, 360, 46, lcd.DARKGREY)
     printText(dateStr, x, y, "8888888888888", font=lcd.FONT_DejaVu24, backgroundColor=lcd.DARKGREY)
   
   elif currentMode in range(4,7):
     #flip mode
-    lcd.fillRect(0, 40, 360, 200, backgroundColor)   
+    #lcd.fillRect(0, 40, 360, 200, backgroundColor)   
     
     #sgv 
     lcd.font(lcd.FONT_DejaVu72)
@@ -346,7 +350,7 @@ def printScreen(clear=False):
     elif directionStr == 'FortyFiveUp': printDirection(x, y, xshift=-4, yshift=4, rotateAngle=135, arrowColor=arrowColor)
     elif directionStr == 'FortyFiveDown': printDirection(x, y, xshift=-4, yshift=-4, rotateAngle=-135, arrowColor=arrowColor)
 
-    lcd.fillRect(0, 360-50, 360, 50, backgroundColor)
+    #lcd.fillRect(0, 360-50, 360, 50, backgroundColor)
     
     #current time
     printText(timeStr, 307, 222, "88888", font=lcd.FONT_DejaVu18, backgroundColor=backgroundColor, rotate=180)  
@@ -369,7 +373,7 @@ def printScreen(clear=False):
     w = lcd.textWidth(dateStr)
     x = (int)(320-(320-w)/2)
     y = 24 + 5
-    lcd.fillRect(0, 0, 360, 40, lcd.DARKGREY)
+    #lcd.fillRect(0, 0, 360, 40, lcd.DARKGREY)
     printText(dateStr, x, y, "8888888888888", font=lcd.FONT_DejaVu24, backgroundColor=lcd.DARKGREY, rotate=180)  
 
   print("----------------------------")
@@ -482,6 +486,16 @@ def mpuMonitor():
     elif hasResponse and acceleration[1] > 0.1 and mode == 8: mode = 7; printScreen(clear=True)
     #print("Acc:", str(acceleration))
     time.sleep(0.5)
+
+def touchPadMonitor():
+    while True:
+        if touch.status() == True:
+            t = touch.read()
+            tx = t[0]
+            ty = t[1]
+            print("Touch screen pressed at " + str(tx) + "," + str(ty))
+            onBtnPressed()
+        time.sleep(0.1)       
 
 def onBtnPressed():
   global emergency, emergencyPause
@@ -620,3 +634,5 @@ _thread.start_new_thread(mpuMonitor, ())
 btnA.wasPressed(onBtnPressed)
 btnB.wasPressed(onBtnPressed)
 btnC.wasPressed(onBtnPressed)
+
+touchPadMonitor()
