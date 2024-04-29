@@ -218,7 +218,7 @@ def printScreen(clear=False):
     tooOld = isOlderThan(newest['date'], OLD_DATA, now)
   except Exception as e:
     sys.print_exception(e)
-  print("Is sgv data older than " + str(OLD_DATA) + " minutes?", tooOld)  
+  #print("Is sgv data older than " + str(OLD_DATA) + " minutes?", tooOld)  
   
   if tooOld: backgroundColor=lcd.DARKGREY; emergency=False
   elif sgv <= EMERGENCY_MIN: backgroundColor=lcd.RED; emergency=(utime.time() > emergencyPause and not tooOld)  
@@ -260,7 +260,7 @@ def printScreen(clear=False):
      lcd.clear(backgroundColor)
      currentBackgroudColor = backgroundColor
   else:
-     print("Skip background clearing")
+     print("Skipped background clearing")
 
   h = str(localtime[3])
   if (localtime[3] < 10): h = "0" + h   
@@ -270,10 +270,12 @@ def printScreen(clear=False):
   #if (localtime[5] < 10): s = "0" + s
   timeStr = h + ":" + m
 
-  if not tooOld and directionStr == 'DoubleUp' and sgv+20>=MAX: arrowColor = lcd.RED
+  if not tooOld and directionStr == 'DoubleUp' and sgv+20>=MAX: arrowColor = lcd.ORANGE
+  elif not tooOld and directionStr == 'DoubleUp' and sgv>=MAX: arrowColor = lcd.RED
   elif not tooOld and directionStr == 'DoubleDown' and sgv-20<=MIN: arrowColor = lcd.RED
-  elif not tooOld and directionStr == 'SingleUp' and sgv+10>=MAX: arrowColor = lcd.ORANGE
-  elif not tooOld and directionStr == 'SingleDown' and sgv-10<=MIN: arrowColor = lcd.ORANGE
+  elif not tooOld and directionStr.endswith('Up') and sgv+10>=MAX: arrowColor = lcd.ORANGE
+  elif not tooOld and directionStr.endswith('Down') and sgv-10<=MIN: arrowColor = lcd.RED
+  elif not tooOld and directionStr == 'DoubleUp' and sgv>MAX: arrowColor = lcd.RED
   else: arrowColor = backgroundColor  
 
   batteryStr = str(batteryLevel) + '%'
