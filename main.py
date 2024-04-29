@@ -270,12 +270,11 @@ def printScreen(clear=False):
   #if (localtime[5] < 10): s = "0" + s
   timeStr = h + ":" + m
 
-  if not tooOld and directionStr == 'DoubleUp' and sgv+20>=MAX: arrowColor = lcd.ORANGE
+  if not tooOld and directionStr == 'DoubleUp' and sgv+20>=MAX and sgv<MAX: arrowColor = lcd.ORANGE
   elif not tooOld and directionStr == 'DoubleUp' and sgv>=MAX: arrowColor = lcd.RED
   elif not tooOld and directionStr == 'DoubleDown' and sgv-20<=MIN: arrowColor = lcd.RED
-  elif not tooOld and directionStr.endswith('Up') and sgv+10>=MAX: arrowColor = lcd.ORANGE
+  elif not tooOld and directionStr.endswith('Up') and sgv+10>=MAX and sgv<MAX: arrowColor = lcd.ORANGE
   elif not tooOld and directionStr.endswith('Down') and sgv-10<=MIN: arrowColor = lcd.RED
-  elif not tooOld and directionStr == 'DoubleUp' and sgv>MAX: arrowColor = lcd.RED
   else: arrowColor = backgroundColor  
 
   batteryStr = str(batteryLevel) + '%'
