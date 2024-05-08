@@ -187,7 +187,7 @@ def drawTriangle(centerX, centerY, arrowColor, rotateAngle=90, width=44, height=
   return x1r, y1r, x2r, y2r, x3r, y3r 
 
 def printScreen(clear=False):
-  global response, mode, brightness, emergency, emergencyPause, MIN, MAX, EMERGENCY_MIN, EMERGENCY_MAX, currentBackgroudColor, screenDrawing, startTime, rgbUnit, secondsDiff, OLD_DATA
+  global response, mode, brightness, emergency, emergencyPause, MIN, MAX, EMERGENCY_MIN, EMERGENCY_MAX, currentBackgroudColor, screenDrawing, startTime, rgbUnit, secondsDiff, OLD_DATA, OLD_DATA_EMERGENCY
   #320*240
 
   print('Printing screen in ' + MODES[mode] + ' mode')
@@ -245,6 +245,13 @@ def printScreen(clear=False):
     if currentMode < 4 or currentMode == 7: currentMode = 2
     else: currentMode = 6
     clear = True
+
+  #old data emergency
+  if utime.time() > emergencyPause and isOlderThan(newest['date'], OLD_DATA_EMERGENCY, now):
+    emergency = True
+    if currentMode < 4 or currentMode == 7: currentMode = 2
+    else: currentMode = 6
+    clear = True   
 
   if "ago" in newest and (currentMode == 0 or currentMode == 4): 
     dateStr = newest['ago']
@@ -449,36 +456,51 @@ def emergencyMonitor():
         print('Low battery level ' + str(batteryLevel) + "%!!!")
       else:
         print('Emergency glucose level ' + str(response[0]['sgv']) + '!!!')
-      rgbUnit.setColor(1, lcd.BLACK)
-      rgbUnit.setColor(2, lcd.RED)
-      if useBeeper == True:
-        #speaker.playTone(523, 2, volume=2)
-        vibrate = not vibrate
-        #intensity += 1
-        #if intensity > 100: intensity = 0
-        power.setVibrationEnable(vibrate) 
-        power.setVibrationIntensity(intensity)   
-      time.sleep(0.5)
-      rgbUnit.setColor(2, lcd.BLACK)
-      rgbUnit.setColor(3, lcd.RED)
-      if useBeeper == True:
-        #speaker.playTone(523, 2, volume=2)
-        vibrate = not vibrate
-        #intensity += 1
-        #if intensity > 100: intensity = 0
-        power.setVibrationEnable(vibrate) 
-        power.setVibrationIntensity(intensity)  
-      time.sleep(0.5)
-      rgbUnit.setColor(3, lcd.BLACK)
-      rgbUnit.setColor(1, lcd.RED)
-      if useBeeper == True:
-        #speaker.playTone(523, 2, volume=2)
-        vibrate = not vibrate
-        #intensity += 1
-        #if intensity > 100: intensity = 0
-        power.setVibrationEnable(vibrate) 
-        power.setVibrationIntensity(intensity)  
-      time.sleep(0.5)
+      
+      if emergency == True:
+        rgbUnit.setColor(1, lcd.BLACK)
+        rgbUnit.setColor(2, lcd.RED)
+        if useBeeper == True:
+          #speaker.playTone(523, 2, volume=2)
+          vibrate = not vibrate
+          #intensity += 1
+          #if intensity > 100: intensity = 0
+          power.setVibrationEnable(vibrate) 
+          power.setVibrationIntensity(intensity)   
+        time.sleep(0.5)
+      else:
+        vibrate = False
+        intensity = 20  
+      
+      if emergency == True:    
+        rgbUnit.setColor(2, lcd.BLACK)
+        rgbUnit.setColor(3, lcd.RED)
+        if useBeeper == True:
+          #speaker.playTone(523, 2, volume=2)
+          vibrate = not vibrate
+          #intensity += 1
+          #if intensity > 100: intensity = 0
+          power.setVibrationEnable(vibrate) 
+          power.setVibrationIntensity(intensity)  
+        time.sleep(0.5)
+      else:
+        vibrate = False
+        intensity = 20  
+      
+      if emergency == True:
+        rgbUnit.setColor(3, lcd.BLACK)
+        rgbUnit.setColor(1, lcd.RED)
+        if useBeeper == True:
+          #speaker.playTone(523, 2, volume=2)
+          vibrate = not vibrate
+          #intensity += 1
+          #if intensity > 100: intensity = 0
+          power.setVibrationEnable(vibrate) 
+          power.setVibrationIntensity(intensity)  
+        time.sleep(0.5)
+      else:
+        vibrate = False
+        intensity = 20          
     else:
       vibrate = False
       intensity = 20  
@@ -554,6 +576,7 @@ try:
   BEEPER_START_TIME = config["beeperStartTime"]
   BEEPER_END_TIME = config["beeperEndTime"]
   OLD_DATA = config["oldData"]
+  OLD_DATA_EMERGENCY = config["oldDataEmergency"]
 
   if INTERVAL<30: INTERVAL=30
   if MIN<30: MIN=30
@@ -565,6 +588,7 @@ try:
   if USE_BEEPER != 1 and USE_BEEPER != 0: USE_BEEPER=1
   if re.search("^GMT[+-]((0?[0-9]|1[0-1]):([0-5][0-9])|12:00)$",TIMEZONE)==None: TIMEZONE="GMT+0:00"
   if OLD_DATA < 10: OLD_DATA=10
+  if OLD_DATA_EMERGENCY < 15: OLD_DATA_EMERGENCY=15
 
   timeStr = TIMEZONE[4:]
   [HH, MM] = [int(i) for i in timeStr.split(':')]
