@@ -229,9 +229,10 @@ def printScreen(clear=False):
   elif sgv > MAX and sgv <= EMERGENCY_MAX: backgroundColor=lcd.ORANGE; emergency=False
   elif sgv > EMERGENCY_MAX: backgroundColor=lcd.ORANGE; emergency=(utime.time() > emergencyPause and not tooOld)  
 
-  rgbUnit.setColor(1, lcd.BLACK)
-  rgbUnit.setColor(2, backgroundColor)
-  rgbUnit.setColor(3, lcd.BLACK)
+  if emergency == False:
+    rgbUnit.setColor(1, lcd.BLACK)
+    rgbUnit.setColor(2, backgroundColor)
+    rgbUnit.setColor(3, lcd.BLACK)
   
   #if emergency change to one of full modes 
   currentMode = mode
@@ -249,8 +250,6 @@ def printScreen(clear=False):
   #old data emergency
   if utime.time() > emergencyPause and isOlderThan(newest['date'], OLD_DATA_EMERGENCY, now):
     emergency = True
-    if currentMode < 4 or currentMode == 7: currentMode = 2
-    else: currentMode = 6
     clear = True   
 
   if "ago" in newest and (currentMode == 0 or currentMode == 4): 
@@ -444,7 +443,7 @@ def backendMonitor():
       time.sleep(backendRetry)
 
 def emergencyMonitor():
-  global emergency, response, rgbUnit
+  global emergency, response, rgbUnit, EMERGENCY_MAX, EMERGENCY_MIN, OLD_DATA_EMERGENCY
   vibrate = False
   intensity = 20
   while True:
@@ -452,10 +451,13 @@ def emergencyMonitor():
     if emergency == True:
       useBeeper = checkBeeper()
       batteryLevel = getBatteryLevel()
+      sgv = response[0]['sgv']
       if batteryLevel < 20:
         print('Low battery level ' + str(batteryLevel) + "%!!!")
+      elif sgv > EMERGENCY_MAX or sgv <= EMERGENCY_MIN:
+        print('Emergency glucose level ' + str(sgv) + '!!!')
       else:
-        print('Emergency glucose level ' + str(response[0]['sgv']) + '!!!')
+        print('SGV data is older than ' + str(OLD_DATA_EMERGENCY) + ' minutes!!!')  
       
       if emergency == True:
         rgbUnit.setColor(1, lcd.BLACK)
