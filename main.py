@@ -228,16 +228,9 @@ def printScreen(clear=False):
   elif sgv > MAX and sgv <= (MAX+10) and directionStr.endswith("Down"): backgroundColor=lcd.DARKGREEN; emergency=False
   elif sgv > MAX and sgv <= EMERGENCY_MAX: backgroundColor=lcd.ORANGE; emergency=False
   elif sgv > EMERGENCY_MAX: backgroundColor=lcd.ORANGE; emergency=(utime.time() > emergencyPause and not tooOld)  
-
-  if emergency == False:
-    rgbUnit.setColor(1, lcd.BLACK)
-    rgbUnit.setColor(2, backgroundColor)
-    rgbUnit.setColor(3, lcd.BLACK)
   
-  #if emergency change to one of full modes 
   currentMode = mode
-  if emergency == True and (mode == 3 or mode == 7): currentMode = 0
-  
+
   #battery level emergency
   batteryLevel = getBatteryLevel()
   uptime = utime.time() - startTime  
@@ -252,6 +245,14 @@ def printScreen(clear=False):
     emergency = True
     clear = True   
 
+  if emergency == False:
+    rgbUnit.setColor(1, lcd.BLACK)
+    rgbUnit.setColor(2, backgroundColor)
+    rgbUnit.setColor(3, lcd.BLACK)
+
+  #if emergency change to one of full modes 
+  if emergency == True and (mode == 3 or mode == 7): currentMode = 0
+  
   if "ago" in newest and (currentMode == 0 or currentMode == 4): 
     dateStr = newest['ago']
   elif currentMode == 2 or currentMode == 6:
