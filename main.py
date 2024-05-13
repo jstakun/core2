@@ -90,8 +90,7 @@ def checkBeeper():
     if USE_BEEPER == 1:
       d = utime.localtime(0)
       now_datetime = rtc.datetime() 
-      now = utime.mktime((now_datetime[0], now_datetime[1], now_datetime[2],
-                          now_datetime[4], now_datetime[5], now_datetime[6],0,0))
+      now = utime.mktime((now_datetime[0], now_datetime[1], now_datetime[2], now_datetime[4], now_datetime[5], now_datetime[6],0,0))
       localtime = utime.localtime(now + secondsDiff)
       
       c = list(d)
@@ -209,8 +208,7 @@ def printScreen(clear=False):
   directionStr = newest['direction']
   
   now_datetime = rtc.datetime()
-  now = utime.mktime((now_datetime[0], now_datetime[1], now_datetime[2],
-                          now_datetime[4], now_datetime[5], now_datetime[6],0,0))  + secondsDiff
+  now = utime.mktime((now_datetime[0], now_datetime[1], now_datetime[2], now_datetime[4], now_datetime[5], now_datetime[6],0,0))  + secondsDiff
   localtime = utime.localtime(now)
   
   tooOld = False
@@ -473,7 +471,8 @@ def emergencyMonitor():
         time.sleep(0.5)
       else:
         vibrate = False
-        intensity = 20  
+        #intensity = 20
+        power.setVibrationEnable(vibrate)  
       
       if emergency == True:    
         rgbUnit.setColor(2, lcd.BLACK)
@@ -488,7 +487,8 @@ def emergencyMonitor():
         time.sleep(0.5)
       else:
         vibrate = False
-        intensity = 20  
+        #intensity = 20  
+        power.setVibrationEnable(vibrate)
       
       if emergency == True:
         rgbUnit.setColor(3, lcd.BLACK)
@@ -503,11 +503,14 @@ def emergencyMonitor():
         time.sleep(0.5)
       else:
         vibrate = False
-        intensity = 20          
+        #intensity = 20          
+        power.setVibrationEnable(vibrate)
+
     else:
       vibrate = False
-      intensity = 20  
-      #print('No emergency')
+      #intensity = 20  
+      #power.setVibrationEnable(vibrate)
+      #print('No emergency status')
       time.sleep(2)
 
 def mpuCallback(t):
