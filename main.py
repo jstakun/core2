@@ -50,7 +50,7 @@ def getBatteryLevel():
 def isOlderThan(date_str, mins, now_seconds): 
   the_date = getDateTuple(date_str)
   the_date_seconds = utime.mktime(the_date)
-  print("Date: " + str(the_date) + " - " + str(the_date_seconds) + ", Now: " + str(now_seconds))
+  #print("Date: " + str(the_date) + " - " + str(the_date_seconds) + ", Now: " + str(now_seconds))
   diff = (now_seconds - the_date_seconds)
   printTime(diff, prefix='Entry read', suffix='ago')
   return diff > (60 * mins)   
@@ -206,6 +206,7 @@ def printScreen(clear=False):
   #if sgv < 100: sgvStr = " " + sgvStr
 
   directionStr = newest['direction']
+  sgvDateStr = newest['date']
   
   now_datetime = rtc.datetime()
   now = utime.mktime((now_datetime[0], now_datetime[1], now_datetime[2], now_datetime[4], now_datetime[5], now_datetime[6],0,0))  + secondsDiff
@@ -213,7 +214,7 @@ def printScreen(clear=False):
   
   tooOld = False
   try:
-    tooOld = isOlderThan(newest['date'], OLD_DATA, now)
+    tooOld = isOlderThan(sgvDateStr, OLD_DATA, now)
   except Exception as e:
     sys.print_exception(e)
   #print("Is sgv data older than " + str(OLD_DATA) + " minutes?", tooOld)  
@@ -239,7 +240,7 @@ def printScreen(clear=False):
     clear = True
 
   #old data emergency
-  if utime.time() > emergencyPause and isOlderThan(newest['date'], OLD_DATA_EMERGENCY, now):
+  if utime.time() > emergencyPause and isOlderThan(sgvDateStr, OLD_DATA_EMERGENCY, now):
     emergency = True
     clear = True   
 
@@ -259,7 +260,7 @@ def printScreen(clear=False):
     else: 
        dateStr = "Battery level unknown"
   else:   
-    dateStr = newest['date'].replace("T", " ")[:-3] #remove seconds
+    dateStr = sgvDateStr.replace("T", " ")[:-3] #remove seconds
   
   if clear or currentBackgroudColor != backgroundColor:
      lcd.clear(backgroundColor)
