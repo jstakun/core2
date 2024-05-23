@@ -222,8 +222,8 @@ def printScreen(clear=False):
   if tooOld: backgroundColor=lcd.DARKGREY; emergency=False
   elif sgv <= EMERGENCY_MIN: backgroundColor=lcd.RED; emergency=(utime.time() > emergencyPause and not tooOld)  
   elif sgv >= (MIN-10) and sgv < MIN and directionStr.endswith("Up"): backgroundColor=lcd.DARKGREEN; emergency=False
-  elif sgv > EMERGENCY_MIN and sgv <= MIN: backgroundColor=lcd.RED; emergency=False
-  elif sgv > MIN and sgv <= MAX: backgroundColor=lcd.DARKGREEN; emergency=False 
+  elif sgv > EMERGENCY_MIN and sgv < MIN: backgroundColor=lcd.RED; emergency=False
+  elif sgv >= MIN and sgv <= MAX: backgroundColor=lcd.DARKGREEN; emergency=False 
   elif sgv > MAX and sgv <= (MAX+10) and directionStr.endswith("Down"): backgroundColor=lcd.DARKGREEN; emergency=False
   elif sgv > MAX and sgv <= EMERGENCY_MAX: backgroundColor=lcd.ORANGE; emergency=False
   elif sgv > EMERGENCY_MAX: backgroundColor=lcd.ORANGE; emergency=(utime.time() > emergencyPause and not tooOld)  
@@ -336,11 +336,13 @@ def printScreen(clear=False):
   
     #dateStr
     lcd.font(lcd.FONT_DejaVu24)
+    textColor = lcd.WHITE
+    if isOlderThan(sgvDateStr, 10, now): textColor = lcd.RED
     w = lcd.textWidth(dateStr)
     x = (int)((320-w)/2)
     y = 240-24-5
     #lcd.fillRect(0, y-5, 360, 46, lcd.DARKGREY)
-    printText(dateStr, x, y, "8888888888888", font=lcd.FONT_DejaVu24, backgroundColor=lcd.DARKGREY)
+    printText(dateStr, x, y, "8888888888888", font=lcd.FONT_DejaVu24, backgroundColor=lcd.DARKGREY, textColor=textColor)
   
   elif currentMode in range(4,7):
     #flip mode
@@ -386,11 +388,13 @@ def printScreen(clear=False):
 
     #dateStr
     lcd.font(lcd.FONT_DejaVu24)
+    textColor = lcd.WHITE
+    if isOlderThan(sgvDateStr, 10, now): textColor = lcd.RED
     w = lcd.textWidth(dateStr)
     x = (int)(320-(320-w)/2)
     y = 24 + 5
     #lcd.fillRect(0, 0, 360, 40, lcd.DARKGREY)
-    printText(dateStr, x, y, "8888888888888", font=lcd.FONT_DejaVu24, backgroundColor=lcd.DARKGREY, rotate=180)  
+    printText(dateStr, x, y, "8888888888888", font=lcd.FONT_DejaVu24, backgroundColor=lcd.DARKGREY, rotate=180, textColor=textColor)  
 
   print("----------------------------")
   screenDrawing = False 
