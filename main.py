@@ -47,12 +47,13 @@ def getBatteryLevel():
   if volt < 4.20: return 100
   if volt >= 4.20: return 101
 
-def isOlderThan(date_str, mins, now_seconds): 
+def isOlderThan(date_str, mins, now_seconds, print_time=False): 
   the_date = getDateTuple(date_str)
   the_date_seconds = utime.mktime(the_date)
   #print("Date: " + str(the_date) + " - " + str(the_date_seconds) + ", Now: " + str(now_seconds))
   diff = (now_seconds - the_date_seconds)
-  printTime(diff, prefix='Entry read', suffix='ago')
+  if print_time == True:
+     printTime(diff, prefix='Entry read', suffix='ago')
   return diff > (60 * mins)   
 
 def getDateTuple(date_str):
@@ -68,7 +69,7 @@ def printTime(seconds, prefix='', suffix=''):
 def saveSgvFile(sgvdict):
   sgvfile = open('sgvdict.txt', 'w')
   for key in sgvdict:
-    sgvfile.write(str(key) + ':' + str(sgvdict[key]) + '\n')
+     sgvfile.write(str(key) + ':' + str(sgvdict[key]) + '\n')
   sgvfile.close()  
 
 def readSgvFile():
@@ -214,7 +215,7 @@ def printScreen(clear=False):
   
   tooOld = False
   try:
-    tooOld = isOlderThan(sgvDateStr, OLD_DATA, now)
+    tooOld = isOlderThan(sgvDateStr, OLD_DATA, now, print_time=True)
   except Exception as e:
     sys.print_exception(e)
   #print("Is sgv data older than " + str(OLD_DATA) + " minutes?", tooOld)  
@@ -337,7 +338,8 @@ def printScreen(clear=False):
     #dateStr
     lcd.font(lcd.FONT_DejaVu24)
     textColor = lcd.WHITE
-    if isOlderThan(sgvDateStr, 10, now): textColor = lcd.RED
+    if isOlderThan(sgvDateStr, 10, now): 
+        textColor = lcd.RED
     w = lcd.textWidth(dateStr)
     x = (int)((320-w)/2)
     y = 240-24-5
