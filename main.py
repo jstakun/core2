@@ -159,7 +159,7 @@ def printText(msg, x, y, cleanupMsg, font=lcd.FONT_DejaVu24, backgroundColor=lcd
 
 def printDirection(x, y, xshift=0, yshift=0, rotateAngle=0, arrowColor=lcd.WHITE, fillColor=lcd.WHITE, backgroundColor=lcd.BLACK):
   global oldX, oldY
-  if oldX != None and oldY != None and oldX != x and oldY != y:
+  if oldX != None and oldY != None and (oldX != x or oldY != y):
     print('Clearing: ' + str(oldX) + "," + str(oldY))
     lcd.circle(oldX, oldY, 40, fillcolor=backgroundColor, color=backgroundColor)  
   lcd.circle(x, y, 40, fillcolor=fillColor, color=fillColor)
@@ -170,7 +170,7 @@ def printDirection(x, y, xshift=0, yshift=0, rotateAngle=0, arrowColor=lcd.WHITE
   
 def printDoubleDirection(x, y, ytop=0, ybottom=0, rotateAngle=0, arrowColor=lcd.WHITE, fillColor=lcd.WHITE, backgroundColor=lcd.BLACK):
   global oldX, oldY
-  if oldX != None and oldY != None and oldX != x and oldY != y:
+  if oldX != None and oldY != None and (oldX != x or oldY != y):
     print('Clearing: ' + str(oldX) + "," + str(oldY))
     lcd.circle(oldX, oldY, 40, fillcolor=backgroundColor, color=backgroundColor)  
   lcd.circle(x, y, 40, fillcolor=fillColor, color=fillColor)
