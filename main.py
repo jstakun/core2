@@ -212,7 +212,7 @@ def drawTriangle(centerX, centerY, arrowColor, rotateAngle=90, width=44, height=
   return x1r, y1r, x2r, y2r, x3r, y3r 
 
 def printScreen(clear=False, noNetwork=False):
-  global response, mode, brightness, emergency, emergencyPause, MIN, MAX, EMERGENCY_MIN, EMERGENCY_MAX, screenDrawing, startTime, rgbUnit, secondsDiff, OLD_DATA, OLD_DATA_EMERGENCY, headerColor, middleColor, footerColor, prevDateStr, prevSgvDiffStr, prevBatteryStr, prevTimeStr, prevSgvStr, oldX, prevY, prevDirectionStr 
+  global response, mode, brightness, emergency, emergencyPause, MIN, MAX, EMERGENCY_MIN, EMERGENCY_MAX, screenDrawing, startTime, rgbUnit, secondsDiff, OLD_DATA, OLD_DATA_EMERGENCY, headerColor, middleColor, footerColor, prevDateStr, prevSgvDiffStr, prevBatteryStr, prevTimeStr, prevSgvStr, prevX, prevY, prevDirectionStr 
   #320*240
 
   print('Printing screen in ' + MODES[mode] + ' mode')
@@ -328,6 +328,8 @@ def printScreen(clear=False, noNetwork=False):
   if backgroundColor != middleColor:
       middleColor = backgroundColor 
       lcd.fillRect(0, 40, 360, 160, backgroundColor)
+      prevDirectionStr = None
+      prevSgvStr = None
   if footerColor != lcd.DARKGREY:
       footerColor = lcd.DARKGREY     
       lcd.fillRect(0, 200, 360, 40, lcd.DARKGREY)
