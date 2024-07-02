@@ -157,28 +157,36 @@ def printText(msg, x, y, cleanupMsg, font=lcd.FONT_DejaVu24, backgroundColor=lcd
   lcd.print(msg, x, y)
   print("Printing " + msg)
 
-def printDirection(x, y, xshift=0, yshift=0, rotateAngle=0, arrowColor=lcd.WHITE, fillColor=lcd.WHITE, backgroundColor=lcd.BLACK):
-  global oldX, oldY
-  if oldX != None and oldY != None and (oldX != x or oldY != y):
-    print('Clearing: ' + str(oldX) + "," + str(oldY))
-    lcd.circle(oldX, oldY, 40, fillcolor=backgroundColor, color=backgroundColor)  
-  lcd.circle(x, y, 40, fillcolor=fillColor, color=fillColor)
-  print("Printing Direction: " + str(x) + ',' + str(y))
-  drawTriangle(x+xshift, y+yshift, arrowColor, rotateAngle)
+def printDirection(x, y, directionStr, xshift=0, yshift=0, rotateAngle=0, arrowColor=lcd.WHITE, fillColor=lcd.WHITE, backgroundColor=lcd.BLACK):
+  global oldX, prevY, prevDirectionStr
+  cleared = False
+  if oldX != None and prevY != None and (oldX != x or prevY != y):
+    print('Clearing: ' + str(oldX) + "," + str(prevY))
+    lcd.circle(oldX, prevY, 40, fillcolor=backgroundColor, color=backgroundColor) 
+    cleared = True 
+  if cleared == True or directionStr != prevDirectionStr:
+    lcd.circle(x, y, 40, fillcolor=fillColor, color=fillColor)
+    print("Printing Direction: " + str(x) + ',' + str(y))
+    drawTriangle(x+xshift, y+yshift, arrowColor, rotateAngle)
   oldX = x
-  oldY = y
-  
-def printDoubleDirection(x, y, ytop=0, ybottom=0, rotateAngle=0, arrowColor=lcd.WHITE, fillColor=lcd.WHITE, backgroundColor=lcd.BLACK):
-  global oldX, oldY
-  if oldX != None and oldY != None and (oldX != x or oldY != y):
-    print('Clearing: ' + str(oldX) + "," + str(oldY))
-    lcd.circle(oldX, oldY, 40, fillcolor=backgroundColor, color=backgroundColor)  
-  lcd.circle(x, y, 40, fillcolor=fillColor, color=fillColor)
-  print("Printing DoubleDirection: " + str(x) + ',' + str(y))
-  drawTriangle(x, y+ytop, arrowColor, rotateAngle)
-  drawTriangle(x, y+ybottom, arrowColor, rotateAngle) 
+  prevY = y
+  prevDirectionStr = directionStr
+
+def printDoubleDirection(x, y, directionStr, ytop=0, ybottom=0, rotateAngle=0, arrowColor=lcd.WHITE, fillColor=lcd.WHITE, backgroundColor=lcd.BLACK):
+  global oldX, prevY, prevDirectionStr
+  cleared = False
+  if oldX != None and prevY != None and (oldX != x or prevY != y):
+    print('Clearing: ' + str(oldX) + "," + str(prevY))
+    lcd.circle(oldX, prevY, 40, fillcolor=backgroundColor, color=backgroundColor)
+    cleared = True  
+  if cleared == True or directionStr != prevDirectionStr:
+    lcd.circle(x, y, 40, fillcolor=fillColor, color=fillColor)
+    print("Printing DoubleDirection: " + str(x) + ',' + str(y))
+    drawTriangle(x, y+ytop, arrowColor, rotateAngle)
+    drawTriangle(x, y+ybottom, arrowColor, rotateAngle) 
   oldX = x
-  oldY = y
+  prevY = y
+  prevDirectionStr = directionStr
   
 def drawTriangle(centerX, centerY, arrowColor, rotateAngle=90, width=44, height=44):
   angle = math.radians(rotateAngle) # Angle to rotate
@@ -204,7 +212,7 @@ def drawTriangle(centerX, centerY, arrowColor, rotateAngle=90, width=44, height=
   return x1r, y1r, x2r, y2r, x3r, y3r 
 
 def printScreen(clear=False, noNetwork=False):
-  global response, mode, brightness, emergency, emergencyPause, MIN, MAX, EMERGENCY_MIN, EMERGENCY_MAX, screenDrawing, startTime, rgbUnit, secondsDiff, OLD_DATA, OLD_DATA_EMERGENCY, headerColor, middleColor, footerColor, prevDateStr, prevSgvDiffStr, prevBatteryStr, prevTimeStr, prevSgvStr, oldX, oldY 
+  global response, mode, brightness, emergency, emergencyPause, MIN, MAX, EMERGENCY_MIN, EMERGENCY_MAX, screenDrawing, startTime, rgbUnit, secondsDiff, OLD_DATA, OLD_DATA_EMERGENCY, headerColor, middleColor, footerColor, prevDateStr, prevSgvDiffStr, prevBatteryStr, prevTimeStr, prevSgvStr, oldX, prevY, prevDirectionStr 
   #320*240
 
   print('Printing screen in ' + MODES[mode] + ' mode')
@@ -305,8 +313,9 @@ def printScreen(clear=False, noNetwork=False):
     headerColor = None
     middleColor = None
     footerColor = None
-    oldX = None
-    oldY = None
+    prevX = None
+    prevY = None
+    prevDirectionStr = None
     prevDateStr = None 
     prevSgvDiffStr = None
     prevBatteryStr = None 
@@ -342,15 +351,16 @@ def printScreen(clear=False, noNetwork=False):
     x += w + 20 + 40
     y = 115 - 10
     
-    if directionStr == 'DoubleUp': printDoubleDirection(x, y, ytop=-12, ybottom=4, rotateAngle=-90, arrowColor=arrowColor, backgroundColor=backgroundColor)
-    elif directionStr == 'DoubleDown': printDoubleDirection(x, y, ytop=-4, ybottom=12, rotateAngle=90, arrowColor=arrowColor, backgroundColor=backgroundColor) 
-    elif directionStr == 'SingleUp': printDirection(x, y, xshift=0, yshift=-4, rotateAngle=-90, arrowColor=arrowColor, backgroundColor=backgroundColor)
-    elif directionStr == 'SingleDown': printDirection(x, y, xshift=0, yshift=4, rotateAngle=90, arrowColor=arrowColor, backgroundColor=backgroundColor)
-    elif directionStr == 'Flat': printDirection(x, y, xshift=4, rotateAngle=0, arrowColor=arrowColor, backgroundColor=backgroundColor)
-    elif directionStr == 'FortyFiveUp': printDirection(x, y, xshift=4, yshift=-4, rotateAngle=-45, arrowColor=arrowColor, backgroundColor=backgroundColor)
-    elif directionStr == 'FortyFiveDown': printDirection(x, y, xshift=4, yshift=4, rotateAngle=45, arrowColor=arrowColor, backgroundColor=backgroundColor)
+    if directionStr == 'DoubleUp': printDoubleDirection(x, y, directionStr, ytop=-12, ybottom=4, rotateAngle=-90, arrowColor=arrowColor, backgroundColor=backgroundColor)
+    elif directionStr == 'DoubleDown': printDoubleDirection(x, y, directionStr, ytop=-4, ybottom=12, rotateAngle=90, arrowColor=arrowColor, backgroundColor=backgroundColor) 
+    elif directionStr == 'SingleUp': printDirection(x, y, directionStr, xshift=0, yshift=-4, rotateAngle=-90, arrowColor=arrowColor, backgroundColor=backgroundColor)
+    elif directionStr == 'SingleDown': printDirection(x, y, directionStr, xshift=0, yshift=4, rotateAngle=90, arrowColor=arrowColor, backgroundColor=backgroundColor)
+    elif directionStr == 'Flat': printDirection(x, y, directionStr, xshift=4, rotateAngle=0, arrowColor=arrowColor, backgroundColor=backgroundColor)
+    elif directionStr == 'FortyFiveUp': printDirection(x, y, directionStr, xshift=4, yshift=-4, rotateAngle=-45, arrowColor=arrowColor, backgroundColor=backgroundColor)
+    elif directionStr == 'FortyFiveDown': printDirection(x, y, directionStr, xshift=4, yshift=4, rotateAngle=45, arrowColor=arrowColor, backgroundColor=backgroundColor)
 
     #draw current time
+    lcd.font(lcd.FONT_DejaVu18)
     if timeStr != prevTimeStr:
       printText(timeStr, 10, 10, prevTimeStr, font=lcd.FONT_DejaVu18, backgroundColor=lcd.DARKGREY)  
       prevTimeStr = timeStr 
@@ -417,15 +427,16 @@ def printScreen(clear=False, noNetwork=False):
     x -= (60 + w)
     y -= 30
     
-    if directionStr == 'DoubleUp': printDoubleDirection(x, y, ytop=-4, ybottom=12, rotateAngle=90, arrowColor=arrowColor, backgroundColor=backgroundColor)
-    elif directionStr == 'DoubleDown': printDoubleDirection(x, y, ytop=-12, ybottom=4, rotateAngle=-90, arrowColor=arrowColor, backgroundColor=backgroundColor) 
-    elif directionStr == 'SingleUp': printDirection(x, y, xshift=0, yshift=4, rotateAngle=90, arrowColor=arrowColor, backgroundColor=backgroundColor)
-    elif directionStr == 'SingleDown': printDirection(x, y, xshift=0, yshift=-4, rotateAngle=-90, arrowColor=arrowColor, backgroundColor=backgroundColor)
-    elif directionStr == 'Flat': printDirection(x, y, xshift=-4, rotateAngle=180, arrowColor=arrowColor, backgroundColor=backgroundColor)
-    elif directionStr == 'FortyFiveUp': printDirection(x, y, xshift=-4, yshift=4, rotateAngle=135, arrowColor=arrowColor, backgroundColor=backgroundColor)
-    elif directionStr == 'FortyFiveDown': printDirection(x, y, xshift=-4, yshift=-4, rotateAngle=-135, arrowColor=arrowColor, backgroundColor=backgroundColor)
+    if directionStr == 'DoubleUp': printDoubleDirection(x, y, directionStr, ytop=-4, ybottom=12, rotateAngle=90, arrowColor=arrowColor, backgroundColor=backgroundColor)
+    elif directionStr == 'DoubleDown': printDoubleDirection(x, y, directionStr, ytop=-12, ybottom=4, rotateAngle=-90, arrowColor=arrowColor, backgroundColor=backgroundColor) 
+    elif directionStr == 'SingleUp': printDirection(x, y, directionStr, xshift=0, yshift=4, rotateAngle=90, arrowColor=arrowColor, backgroundColor=backgroundColor)
+    elif directionStr == 'SingleDown': printDirection(x, y, directionStr, xshift=0, yshift=-4, rotateAngle=-90, arrowColor=arrowColor, backgroundColor=backgroundColor)
+    elif directionStr == 'Flat': printDirection(x, y, directionStr, xshift=-4, rotateAngle=180, arrowColor=arrowColor, backgroundColor=backgroundColor)
+    elif directionStr == 'FortyFiveUp': printDirection(x, y, directionStr, xshift=-4, yshift=4, rotateAngle=135, arrowColor=arrowColor, backgroundColor=backgroundColor)
+    elif directionStr == 'FortyFiveDown': printDirection(x, y, directionStr, xshift=-4, yshift=-4, rotateAngle=-135, arrowColor=arrowColor, backgroundColor=backgroundColor)
   
     #draw current time
+    lcd.font(lcd.FONT_DejaVu18)
     if timeStr != prevTimeStr:
       printText(timeStr, 307, 222, prevTimeStr, font=lcd.FONT_DejaVu18, backgroundColor=lcd.DARKGREY, rotate=180)  
       prevTimeStr = timeStr
@@ -436,7 +447,7 @@ def printScreen(clear=False, noNetwork=False):
       if batteryLevel < 20 and backgroundColor != lcd.RED: textColor = lcd.RED
       w = lcd.textWidth(batteryStr)
       if prevBatteryStr != None: 
-        cleanupX = math.ceil(320-5-lcd.textWidth(prevBatteryStr))
+        cleanupX = math.ceil(lcd.textWidth(prevBatteryStr)+5)
       else:
         cleanupX = None 
       printText(batteryStr, math.ceil(w+5), 222, prevBatteryStr, font=lcd.FONT_DejaVu18, backgroundColor=lcd.DARKGREY, rotate=180, textColor=textColor, cleanupX=cleanupX) 
@@ -643,7 +654,8 @@ headerColor = None
 middleColor = None
 footerColor = None
 oldX = None
-oldY = None
+prevY = None
+prevDirectionStr = None
 prevDateStr = None 
 prevSgvDiffStr = None
 prevBatteryStr = None 
