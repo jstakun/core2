@@ -383,7 +383,7 @@ def printScreen(clear=False, noNetwork=False):
       if math.fabs(sgvDiff) >= 10 and backgroundColor != lcd.RED: textColor = lcd.RED
       w = lcd.textWidth(sgvDiffStr)
       if prevSgvDiffStr != None: 
-        cleanupX = math.ceil(w+(320-lcd.textWidth(prevSgvDiffStr))/2)
+        cleanupX = math.ceil((320-lcd.textWidth(prevSgvDiffStr))/2)
       else:
         cleanupX = None 
       x = math.ceil((320-w)/2)
@@ -459,7 +459,8 @@ def printScreen(clear=False, noNetwork=False):
       if math.fabs(sgvDiff) >= 10 and backgroundColor != lcd.RED: textColor = lcd.RED
       w = lcd.textWidth(sgvDiffStr)
       if prevSgvDiffStr != None: 
-        cleanupX = math.ceil(w+(320-lcd.textWidth(prevSgvDiffStr))/2)
+        wp = lcd.textWidth(prevSgvDiffStr)
+        cleanupX = math.ceil(wp+(320-wp)/2)
       else:
         cleanupX = None 
       x = math.ceil(w+(320-w)/2)
