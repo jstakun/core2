@@ -305,7 +305,8 @@ def printScreen(clear=False, noNetwork=False):
 
   batteryStr = str(batteryLevel) + '%'
 
-  sgvDiff = sgv-response[1]['sgv']
+  sgvDiff = 0
+  if len(response) > 1: sgvDiff = sgv - response[1]['sgv']
   sgvDiffStr = str(sgvDiff)
   if sgvDiff > 0: sgvDiffStr = "+" + sgvDiffStr
    
@@ -364,7 +365,7 @@ def printScreen(clear=False, noNetwork=False):
     #draw current time
     lcd.font(lcd.FONT_DejaVu18)
     if timeStr != prevTimeStr:
-      printText(timeStr, 10, 10, prevTimeStr, font=lcd.FONT_DejaVu18, backgroundColor=lcd.DARKGREY)  
+      printText(timeStr, 10, 12, prevTimeStr, font=lcd.FONT_DejaVu18, backgroundColor=lcd.DARKGREY)  
       prevTimeStr = timeStr 
 
     #draw battery
@@ -376,7 +377,7 @@ def printScreen(clear=False, noNetwork=False):
         cleanupX = math.ceil(320-5-lcd.textWidth(prevBatteryStr))
       else:
         cleanupX = None 
-      printText(batteryStr, math.ceil(320-5-w), 10, prevBatteryStr, font=lcd.FONT_DejaVu18, backgroundColor=lcd.DARKGREY, textColor=textColor, cleanupX=cleanupX) 
+      printText(batteryStr, math.ceil(320-5-w), 12, prevBatteryStr, font=lcd.FONT_DejaVu18, backgroundColor=lcd.DARKGREY, textColor=textColor, cleanupX=cleanupX) 
       prevBatteryStr = batteryStr 
 
     #draw sgv diff
@@ -389,7 +390,7 @@ def printScreen(clear=False, noNetwork=False):
       else:
         cleanupX = None 
       x = math.ceil((320-w)/2)
-      printText(sgvDiffStr, x, 10, prevSgvDiffStr, font=lcd.FONT_DejaVu18, backgroundColor=lcd.DARKGREY, textColor=textColor, cleanupX=cleanupX)
+      printText(sgvDiffStr, x, 12, prevSgvDiffStr, font=lcd.FONT_DejaVu18, backgroundColor=lcd.DARKGREY, textColor=textColor, cleanupX=cleanupX)
       prevSgvDiffStr = sgvDiffStr
     
     #draw dateStr
@@ -502,7 +503,9 @@ def backendMonitor():
       print('Sgv:', response[0]['sgv'])
       print('Direction:', response[0]['direction'])
       print('Read: ' + response[0]['date'] + ' (' + TIMEZONE + ')')
-      sgvDiff = response[0]['sgv'] - response[1]['sgv']
+      sgv = response[0]['sgv']
+      sgvDiff = 0
+      if len(response) > 1: sgvDiff = sgv - response[1]['sgv']
       print('Sgv diff from previous read:', sgvDiff)
 
       d = OrderedDict()
@@ -526,12 +529,19 @@ def backendMonitor():
       #print(sgvDict)  
       
       printScreen()
-      time.sleep(INTERVAL)
+      
+      nextCheck = INTERVAL
+      if sgv <= EMERGENCY_MIN: nextCheck=INTERVAL/5
+      elif sgv > EMERGENCY_MIN and sgv < MIN: nextCheck=INTERVAL/2
+      elif sgv > MAX and sgv <= EMERGENCY_MAX: nextCheck=INTERVAL/2
+      elif sgv > EMERGENCY_MAX: nextCheck=INTERVAL/3
+      print('Next backend call in ' + str(nextCheck) + " secs...")
+      time.sleep(nextCheck)
     except Exception as e:
       sys.print_exception(e)
       print('Battery level: ' + str(getBatteryLevel()) + '%')
-      print('Network error. Retry in ' + str(backendRetry) + ' sec...')
       if response != '{}': printScreen(noNetwork=True)
+      print('Network error. Retry in ' + str(backendRetry) + ' secs...')
       time.sleep(backendRetry)
 
 def emergencyMonitor():
