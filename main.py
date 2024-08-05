@@ -215,7 +215,7 @@ def printScreen(clear=False, noNetwork=False):
   global response, mode, brightness, emergency, emergencyPause, MIN, MAX, EMERGENCY_MIN, EMERGENCY_MAX, screenDrawing, startTime, rgbUnit, secondsDiff, OLD_DATA, OLD_DATA_EMERGENCY, headerColor, middleColor, footerColor, prevDateStr, prevSgvDiffStr, prevBatteryStr, prevTimeStr, prevSgvStr, prevX, prevY, prevDirectionStr 
   #320*240
 
-  print('Printing screen in ' + MODES[mode] + ' mode')
+  print('Printing screen in ' + MODES[mode] + ' mode -----')
   waitTime = 0.0
   while screenDrawing == True:
     time.sleep(0.1)
@@ -485,11 +485,11 @@ def printScreen(clear=False, noNetwork=False):
       printText(dateStr, x, y, prevDateStr, font=lcd.FONT_DejaVu24, backgroundColor=lcd.DARKGREY, rotate=180, textColor=textColor, cleanupX=cleanupX)  
       prevDateStr = dateStr
 
-  print("----------------------------")
+  print("Printing screen finished ----- ")
   screenDrawing = False 
 
 def backendMonitor():
-  global response, INTERVAL, API_ENDPOINT, API_TOKEN, LOCALE, TIMEZONE, startTime, sgvDict
+  global response, INTERVAL, API_ENDPOINT, API_TOKEN, LOCALE, TIMEZONE, startTime, sgvDict, secondsDiff
   backendRetry = math.ceil(INTERVAL/4)
   while True:
     try:
@@ -500,14 +500,30 @@ def backendMonitor():
       s = utime.time()
       response = urequests.get(API_ENDPOINT + "/entries.json?count=10",headers={'api-secret': API_TOKEN,'accept-language': LOCALE,'accept-charset': 'ascii', 'x-gms-tz': TIMEZONE}).json()
       printTime((utime.time() - s), prefix='Response received in')
-      print('Sgv:', response[0]['sgv'])
-      print('Direction:', response[0]['direction'])
-      print('Read: ' + response[0]['date'] + ' (' + TIMEZONE + ')')
       sgv = response[0]['sgv']
+      sgvDate = response[0]['date']
+      print('Sgv:', sgv)
+      print('Direction:', response[0]['direction'])
+      print('Read: ' + sgvDate + ' (' + TIMEZONE + ')')
       sgvDiff = 0
       if len(response) > 1: sgvDiff = sgv - response[1]['sgv']
       print('Sgv diff from previous read:', sgvDiff)
 
+      printScreen()
+      
+      nextCheck = INTERVAL
+      #if read older than 4 mins increase frequency
+      now_datetime = rtc.datetime()
+      now = utime.mktime((now_datetime[0], now_datetime[1], now_datetime[2], now_datetime[4], now_datetime[5], now_datetime[6],0,0))  + secondsDiff
+      if isOlderThan(sgvDate, 4, now):
+        if sgv <= EMERGENCY_MIN: nextCheck=INTERVAL/6
+        elif sgv > EMERGENCY_MIN and sgv < MIN: nextCheck=INTERVAL/3
+        elif sgv > MAX and sgv <= EMERGENCY_MAX: nextCheck=INTERVAL/3
+        elif sgv > EMERGENCY_MAX: nextCheck=INTERVAL/4
+        else: nextCheck=INTERVAL/2 
+      print('Next backend call in ' + str(nextCheck) + " secs...")
+
+      #save read entries to file
       d = OrderedDict()
       seconds = -1
       for index, entry in enumerate(response):
@@ -528,14 +544,7 @@ def backendMonitor():
       print('Cached ' + str(dictLen) + " sgv entries")
       #print(sgvDict)  
       
-      printScreen()
-      
-      nextCheck = INTERVAL
-      if sgv <= EMERGENCY_MIN: nextCheck=INTERVAL/5
-      elif sgv > EMERGENCY_MIN and sgv < MIN: nextCheck=INTERVAL/2
-      elif sgv > MAX and sgv <= EMERGENCY_MAX: nextCheck=INTERVAL/2
-      elif sgv > EMERGENCY_MAX: nextCheck=INTERVAL/3
-      print('Next backend call in ' + str(nextCheck) + " secs...")
+      print('---------------------------')
       time.sleep(nextCheck)
     except Exception as e:
       sys.print_exception(e)
@@ -547,7 +556,7 @@ def backendMonitor():
 def emergencyMonitor():
   global emergency, response, rgbUnit, EMERGENCY_MAX, EMERGENCY_MIN, OLD_DATA_EMERGENCY
   vibrate = False
-  intensity = 20
+  intensity = 10
   while True:
     #print('Emergency monitor checking status')
     if emergency == True:
@@ -611,7 +620,7 @@ def emergencyMonitor():
 
     else:
       vibrate = False
-      #intensity = 20  
+      intensity = 10  
       #power.setVibrationEnable(vibrate)
       #print('No emergency status')
       time.sleep(2)
