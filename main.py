@@ -523,6 +523,7 @@ def backendMonitor():
         else: nextCheck=INTERVAL/2 
       print('Next backend call in ' + str(nextCheck) + " secs...")
 
+      s = utime.time()
       #save read entries to file
       d = OrderedDict()
       seconds = -1
@@ -542,7 +543,9 @@ def backendMonitor():
       sgvDict = d
       saveSgvFile(d)
       print('Cached ' + str(dictLen) + " sgv entries")
-      #print(sgvDict)  
+      #print(sgvDict) 
+      
+      nextCheck -= (utime.time()-s) 
       
       print('---------------------------')
       time.sleep(nextCheck)
