@@ -85,6 +85,28 @@ def readSgvFile():
     sys.print_exception(e)
   return d 
 
+def persistEntries():
+  global response, sgvDict
+  d = OrderedDict()
+  seconds = -1
+  for index, entry in enumerate(response):
+    the_date = getDateTuple(entry['date'])  
+    seconds = utime.mktime(the_date)
+    d.update({seconds: entry['sgv']})
+
+  dictLen = len(d)  
+  for key in sgvDict:
+    if key < seconds and dictLen < 50:
+       d.update({key: sgvDict[key]})
+    elif dictLen >= 50:
+      break  
+    dictLen = len(d)
+
+  sgvDict = d
+  saveSgvFile(d)
+  print('Persisted ' + str(dictLen) + " sgv entries")
+      
+
 def checkBeeper():
   global USE_BEEPER, BEEPER_START_TIME, BEEPER_END_TIME, secondsDiff 
   try:   
@@ -214,8 +236,8 @@ def drawTriangle(centerX, centerY, arrowColor, rotateAngle=90, width=44, height=
 def printScreen(clear=False, noNetwork=False):
   global response, mode, brightness, emergency, emergencyPause, MIN, MAX, EMERGENCY_MIN, EMERGENCY_MAX, screenDrawing, startTime, rgbUnit, secondsDiff, OLD_DATA, OLD_DATA_EMERGENCY, headerColor, middleColor, footerColor, prevDateStr, prevSgvDiffStr, prevBatteryStr, prevTimeStr, prevSgvStr, prevX, prevY, prevDirectionStr 
   #320*240
-
-  print('Printing screen in ' + MODES[mode] + ' mode -----')
+  s = utime.time()
+  print('Printing screen in ' + MODES[mode] + ' mode')
   waitTime = 0.0
   while screenDrawing == True:
     time.sleep(0.1)
@@ -485,7 +507,7 @@ def printScreen(clear=False, noNetwork=False):
       printText(dateStr, x, y, prevDateStr, font=lcd.FONT_DejaVu24, backgroundColor=lcd.DARKGREY, rotate=180, textColor=textColor, cleanupX=cleanupX)  
       prevDateStr = dateStr
 
-  print("Printing screen finished ----- ")
+  print("Printing screen finished in " + str((utime.time() - s)) + " secs ...")
   screenDrawing = False 
 
 def backendMonitor():
@@ -521,31 +543,9 @@ def backendMonitor():
         elif sgv > MAX and sgv <= EMERGENCY_MAX: nextCheck=INTERVAL/3
         elif sgv > EMERGENCY_MAX: nextCheck=INTERVAL/4
         else: nextCheck=INTERVAL/2 
-      print('Next backend call in ' + str(nextCheck) + " secs...")
+      print('Next backend call in ' + str(nextCheck) + " secs ...")
 
-      s = utime.time()
-      #save read entries to file
-      d = OrderedDict()
-      seconds = -1
-      for index, entry in enumerate(response):
-        the_date = getDateTuple(entry['date'])  
-        seconds = utime.mktime(the_date)
-        d.update({seconds: entry['sgv']})
-
-      dictLen = len(d)  
-      for key in sgvDict:
-        if key < seconds and dictLen < 50:
-          d.update({key: sgvDict[key]})
-        elif dictLen >= 50:
-          break  
-        dictLen = len(d)
-
-      sgvDict = d
-      saveSgvFile(d)
-      print('Cached ' + str(dictLen) + " sgv entries")
-      #print(sgvDict) 
-      
-      nextCheck -= (utime.time()-s) 
+      _thread.start_new_thread(persistEntries, ()) 
       
       print('---------------------------')
       time.sleep(nextCheck)
@@ -553,7 +553,7 @@ def backendMonitor():
       sys.print_exception(e)
       print('Battery level: ' + str(getBatteryLevel()) + '%')
       if response != '{}': printScreen(noNetwork=True)
-      print('Network error. Retry in ' + str(backendRetry) + ' secs...')
+      print('Network error. Retry in ' + str(backendRetry) + ' secs ...')
       time.sleep(backendRetry)
 
 def emergencyMonitor():
