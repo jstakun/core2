@@ -17,6 +17,7 @@ import unit
 from collections import OrderedDict
 from imu import IMU
 import re
+import json
 
 EMERGENCY_PAUSE_INTERVAL = 1800  #sec = 30 mins
 MODES = ["full_elapsed", "full_date", "full_battery", "basic", "flip_full_elapsed", "flip_full_date", "flip_full_battery", "chart", "flip_chart"]
@@ -66,6 +67,23 @@ def printTime(seconds, prefix='', suffix=''):
   h, m = divmod(m, 60)
   print(prefix + ' {:02d}:{:02d}:{:02d} '.format(h, m, s) + suffix)  
 
+def saveResponseFile():
+  global response
+  responseFile = open('response.txt', 'w')
+  responseFile.write(str(response))
+  responseFile.close()  
+
+def readResponseFile():
+  global response
+  try:
+    responseFile = open('response.txt', 'r')
+    response = json.load(responseFile)
+    responseFile.close()
+  except Exception as e:
+    sys.print_exception(e)
+    response = None
+    
+
 def saveSgvFile(sgvdict):
   sgvfile = open('sgvdict.txt', 'w')
   for key in sgvdict:
@@ -81,12 +99,14 @@ def readSgvFile():
       if ":" in entry:
         [s, v] = [int(i) for i in entry.split(':')]
         d.update({s: v})
+    sgvfile.close()    
   except Exception as e:
     sys.print_exception(e)
   return d 
 
 def persistEntries():
   global response, sgvDict
+  saveResponseFile()
   d = OrderedDict()
   seconds = -1
   for index, entry in enumerate(response):
@@ -346,16 +366,16 @@ def printScreen(clear=False, noNetwork=False):
     prevSgvStr = None
     
   if headerColor != lcd.DARKGREY:
-      headerColor = lcd.DARKGREY
-      lcd.fillRect(0, 0, 360, 40, lcd.DARKGREY)
+    headerColor = lcd.DARKGREY
+    lcd.fillRect(0, 0, 360, 40, lcd.DARKGREY)
   if backgroundColor != middleColor:
-      middleColor = backgroundColor 
-      lcd.fillRect(0, 40, 360, 160, backgroundColor)
-      prevDirectionStr = None
-      prevSgvStr = None
+    middleColor = backgroundColor 
+    lcd.fillRect(0, 40, 360, 160, backgroundColor)
+    prevDirectionStr = None
+    prevSgvStr = None
   if footerColor != lcd.DARKGREY:
-      footerColor = lcd.DARKGREY     
-      lcd.fillRect(0, 200, 360, 40, lcd.DARKGREY)
+    footerColor = lcd.DARKGREY     
+    lcd.fillRect(0, 200, 360, 40, lcd.DARKGREY)
 
   if currentMode in range (0,3):  
 
@@ -552,7 +572,8 @@ def backendMonitor():
     except Exception as e:
       sys.print_exception(e)
       print('Battery level: ' + str(getBatteryLevel()) + '%')
-      if response != '{}': printScreen(noNetwork=True)
+      if response == None: readResponseFile()
+      if response != None: printScreen(noNetwork=True)
       print('Network error. Retry in ' + str(backendRetry) + ' secs ...')
       time.sleep(backendRetry)
 
@@ -631,7 +652,7 @@ def emergencyMonitor():
 def mpuCallback(t):
   global mpu, mode, response
   acceleration = mpu.acceleration
-  hasResponse = (response != '{}')
+  hasResponse = (response != None)
   if hasResponse and acceleration[1] < -0.1 and mode in range(0,3): mode += 4; printScreen(clear=True) #change to 'Flip mode' #4,5,6
   elif hasResponse and acceleration[1] > 0.1 and mode in range(4,7): mode -= 4; printScreen(clear=True) #change to 'Normal mode' #0,1,2
   elif hasResponse and acceleration[1] < -0.1 and mode == 7: mode = 8; printScreen(clear=True)
@@ -669,7 +690,7 @@ print('Free memory:', str(gc.mem_free()) + ' bytes')
 machine_id = binascii.hexlify(machine.unique_id())
 print('Machine unique id:', machine_id.decode())
 
-response = '{}'
+response = None
 brightness = 32
 emergency = False
 emergencyPause = 0
