@@ -21,6 +21,8 @@ import json
 
 EMERGENCY_PAUSE_INTERVAL = 1800  #sec = 30 mins
 MODES = ["full_elapsed", "full_date", "full_battery", "basic", "flip_full_elapsed", "flip_full_date", "flip_full_battery", "chart", "flip_chart"]
+SGVDICT_FILE = 'sgvdict.txt'
+RESPONSE_FILE = 'response.txt'
 
 def getBatteryLevel():
   volt = power.getBatVoltage()
@@ -69,14 +71,14 @@ def printTime(seconds, prefix='', suffix=''):
 
 def saveResponseFile():
   global response
-  responseFile = open('response.txt', 'w')
-  responseFile.write(str(response))
+  responseFile = open(RESPONSE_FILE, 'w')
+  responseFile.write(str(response).replace('\'','\"'))
   responseFile.close()  
 
 def readResponseFile():
   global response
   try:
-    responseFile = open('response.txt', 'r')
+    responseFile = open(RESPONSE_FILE, 'r')
     response = json.load(responseFile)
     responseFile.close()
   except Exception as e:
@@ -85,7 +87,7 @@ def readResponseFile():
     
 
 def saveSgvFile(sgvdict):
-  sgvfile = open('sgvdict.txt', 'w')
+  sgvfile = open(SGVDICT_FILE, 'w')
   for key in sgvdict:
      sgvfile.write(str(key) + ':' + str(sgvdict[key]) + '\n')
   sgvfile.close()  
@@ -93,7 +95,7 @@ def saveSgvFile(sgvdict):
 def readSgvFile():
   d = OrderedDict()
   try: 
-    sgvfile = open('sgvdict.txt', 'r')
+    sgvfile = open(SGVDICT_FILE, 'r')
     entries = sgvfile.read().split('\n')
     for entry in entries:
       if ":" in entry:
