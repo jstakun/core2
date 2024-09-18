@@ -2,6 +2,7 @@ from m5stack import *
 from m5stack_ui import *
 from uiflow import *
 import math
+import os
 import time
 import ujson
 import network
@@ -69,6 +70,23 @@ def printTime(seconds, prefix='', suffix=''):
   h, m = divmod(m, 60)
   print(prefix + ' {:02d}:{:02d}:{:02d} '.format(h, m, s) + suffix)  
 
+def saveConfig(name, value):
+  configFile = open(name + ".conf", 'w')
+  configFile.write(str(value))
+  configFile.close()  
+  print('Saved config ' + name + ' value: ' + str(value))
+  
+def readConfig(name, defaultValue):
+  res = defaultValue
+  try:
+    os.stat(name + ".conf")
+    configFile = open(name + ".conf", 'r')
+    res = configFile.read()        
+  except OSError:
+    print('Config file ' + name + '.conf not found')
+  print('Read config ' + name + ' value: ' + res)  
+  return res
+ 
 def saveResponseFile():
   global response
   responseFile = open(RESPONSE_FILE, 'w')
@@ -85,7 +103,6 @@ def readResponseFile():
     sys.print_exception(e)
     response = None
     
-
 def saveSgvFile(sgvdict):
   sgvfile = open(SGVDICT_FILE, 'w')
   for key in sgvdict:
@@ -680,6 +697,7 @@ def onBtnPressed():
     if brightness > 128: brightness = 32
     screen = M5Screen()
     screen.set_screen_brightness(brightness)
+    saveConfig('brightness', brightness)
 
 # ------------------------------------------------------------------------------     
 
@@ -693,7 +711,6 @@ machine_id = binascii.hexlify(machine.unique_id())
 print('Machine unique id:', machine_id.decode())
 
 response = None
-brightness = 32
 emergency = False
 emergencyPause = 0
 screenDrawing = False
@@ -710,6 +727,7 @@ prevBatteryStr = None
 prevTimeStr = None 
 prevSgvStr = None
 
+brightness = int(readConfig('brightness', "32"))
 screen = M5Screen()
 screen.set_screen_brightness(brightness)
 
