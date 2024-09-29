@@ -444,7 +444,7 @@ def printScreen(clear=False, noNetwork=False):
     #draw sgv diff
     if prevSgvDiffStr != sgvDiffStr:
       textColor = lcd.WHITE
-      if math.fabs(sgvDiff) >= 10 and backgroundColor != lcd.RED: textColor = lcd.RED
+      if math.fabs(sgvDiff) >= 10 and backgroundColor != lcd.RED and not tooOld: textColor = lcd.RED
       w = lcd.textWidth(sgvDiffStr)
       if prevSgvDiffStr != None: 
         cleanupX = math.ceil((320-lcd.textWidth(prevSgvDiffStr))/2)
@@ -520,7 +520,7 @@ def printScreen(clear=False, noNetwork=False):
     #draw sgv diff
     if prevSgvDiffStr != sgvDiffStr:
       textColor = lcd.WHITE
-      if math.fabs(sgvDiff) >= 10 and backgroundColor != lcd.RED: textColor = lcd.RED
+      if math.fabs(sgvDiff) >= 10 and backgroundColor != lcd.RED and not tooOld: textColor = lcd.RED
       w = lcd.textWidth(sgvDiffStr)
       if prevSgvDiffStr != None: 
         wp = lcd.textWidth(prevSgvDiffStr)
@@ -813,7 +813,7 @@ print("")
 printCenteredText("Setting time...", backgroundColor=lcd.DARKGREY) #lcd.GREENYELLOW)
 
 try: 
-  rtc.settime('ntp', host='pool.ntp.org', tzone=0) #UTC
+  rtc.settime('ntp', host='pool.ntp.org', tzone=1) #UTC -> 1 hour difference bug
   print("Current UTC datetime " +  str(rtc.datetime()))
   startTime = utime.time()
 except Exception as e:
