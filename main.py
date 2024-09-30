@@ -704,14 +704,25 @@ def onBtnPressed():
 
 # ------------------------------------------------------------------------------     
 
+brightness = int(readConfig('brightness', "32"))
+screen = M5Screen()
+screen.set_screen_brightness(brightness)
+
+lcd.clear(lcd.DARKGREY)
+
 print('Starting...')
 print('APIKEY:',deviceCfg.get_apikey())
+print('Board name:', deviceCfg.get_board_name())
 macaddr=wifiCfg.wlan_sta.config('mac')
 macaddr='{:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}'.format(*macaddr)
 print('MAC Adddress:', macaddr)
 print('Free memory:', str(gc.mem_free()) + ' bytes')
 machine_id = binascii.hexlify(machine.unique_id())
 print('Machine unique id:', machine_id.decode())
+
+mpu = IMU()
+mode = 0
+if mpu.acceleration[1] < 0: mode = 4 #flip
 
 response = None
 emergency = False
@@ -729,10 +740,6 @@ prevSgvDiffStr = None
 prevBatteryStr = None 
 prevTimeStr = None 
 prevSgvStr = None
-
-brightness = int(readConfig('brightness', "32"))
-screen = M5Screen()
-screen.set_screen_brightness(brightness)
 
 try: 
   confFile = open('config.json', 'r')
@@ -771,10 +778,6 @@ try:
   secondsDiff = HH * 3600 + MM * 60
   if TIMEZONE[3] == "-": secondsDiff = secondsDiff * -1
   print('Local time seconds diff from UTC:', secondsDiff) 
-
-  mpu = IMU()
-  mode = 0
-  if mpu.acceleration[1] < 0: mode = 4 #flip
 
   rgbUnit = unit.get(unit.RGB, unit.PORTA)
   rgbUnit.setColor(2, lcd.DARKGREY)
