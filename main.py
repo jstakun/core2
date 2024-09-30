@@ -613,9 +613,12 @@ def emergencyMonitor():
       else:
         print('SGV data is older than ' + str(OLD_DATA_EMERGENCY) + ' minutes!!!')  
       
+      beepColor = lcd.RED
+      if sgv > EMERGENCY_MAX: beepColor = lcd.ORANGE  
+      
       if emergency == True:
         rgbUnit.setColor(1, lcd.BLACK)
-        rgbUnit.setColor(2, lcd.RED)
+        rgbUnit.setColor(2, beepColor)
         if useBeeper == True:
           #speaker.playTone(523, 2, volume=2)
           vibrate = not vibrate
@@ -631,7 +634,7 @@ def emergencyMonitor():
       
       if emergency == True:    
         rgbUnit.setColor(2, lcd.BLACK)
-        rgbUnit.setColor(3, lcd.RED)
+        rgbUnit.setColor(3, beepColor)
         if useBeeper == True:
           #speaker.playTone(523, 2, volume=2)
           vibrate = not vibrate
@@ -647,7 +650,7 @@ def emergencyMonitor():
       
       if emergency == True:
         rgbUnit.setColor(3, lcd.BLACK)
-        rgbUnit.setColor(1, lcd.RED)
+        rgbUnit.setColor(1, beepColor)
         if useBeeper == True:
           #speaker.playTone(523, 2, volume=2)
           vibrate = not vibrate
