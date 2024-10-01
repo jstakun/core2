@@ -578,7 +578,7 @@ def backendMonitor():
       now = utime.mktime((now_datetime[0], now_datetime[1], now_datetime[2], now_datetime[4], now_datetime[5], now_datetime[6],0,0))  + secondsDiff
       if isOlderThan(sgvDate, 4, now):
         if sgv <= EMERGENCY_MIN: nextCheck=INTERVAL/6
-        elif sgv > EMERGENCY_MIN and sgv < MIN: nextCheck=INTERVAL/3
+        elif sgv > EMERGENCY_MIN and sgv < MIN: nextCheck=INTERVAL/5
         elif sgv > MAX and sgv <= EMERGENCY_MAX: nextCheck=INTERVAL/3
         elif sgv > EMERGENCY_MAX: nextCheck=INTERVAL/4
         else: nextCheck=INTERVAL/2 
@@ -720,15 +720,12 @@ print('Free memory:', str(gc.mem_free()) + ' bytes')
 machine_id = binascii.hexlify(machine.unique_id())
 print('Machine unique id:', machine_id.decode())
 
-mpu = IMU()
-mode = 0
-if mpu.acceleration[1] < 0: mode = 4 #flip
-
 response = None
 emergency = False
 emergencyPause = 0
 screenDrawing = False
-
+mode = 0
+  
 headerColor = None
 middleColor = None
 footerColor = None
@@ -779,6 +776,9 @@ try:
   if TIMEZONE[3] == "-": secondsDiff = secondsDiff * -1
   print('Local time seconds diff from UTC:', secondsDiff) 
 
+  mpu = IMU()
+  if mpu.acceleration[1] < 0: mode = 4 #flip
+
   rgbUnit = unit.get(unit.RGB, unit.PORTA)
   rgbUnit.setColor(2, lcd.DARKGREY)
 
@@ -819,7 +819,7 @@ print("")
 printCenteredText("Setting time...", backgroundColor=lcd.DARKGREY) #lcd.GREENYELLOW)
 
 try: 
-  rtc.settime('ntp', host='pool.ntp.org', tzone=1) #UTC -> 1 hour difference bug
+  rtc.settime('ntp', host='pool.ntp.org', tzone=0) #UTC 
   print("Current UTC datetime " +  str(rtc.datetime()))
   startTime = utime.time()
 except Exception as e:
