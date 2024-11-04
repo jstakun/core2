@@ -272,7 +272,7 @@ def drawTriangle(centerX, centerY, arrowColor, rotateAngle=90, width=44, height=
   #lcd.triangle(int(x1r), int(y1r), int(x2r), int(y2r), int(x3r), int(y3r), fillcolor=arrowColor, color=arrowColor)
   return x1r, y1r, x2r, y2r, x3r, y3r 
 
-def printScreen(clear=False, noNetwork=False):
+def printScreen(newestEntry, clear=False, noNetwork=False):
   global response, mode, brightness, emergency, emergencyPause, MIN, MAX, EMERGENCY_MIN, EMERGENCY_MAX, screenDrawing, startTime, rgbUnit, secondsDiff, OLD_DATA, OLD_DATA_EMERGENCY, headerColor, middleColor, footerColor, prevDateStr, prevSgvDiffStr, prevBatteryStr, prevTimeStr, prevSgvStr, prevX, prevY, prevDirectionStr 
   #320*240
   s = utime.time()
@@ -287,13 +287,12 @@ def printScreen(clear=False, noNetwork=False):
     print('Finished in ' + str(waitTime) + ' seconds')
   screenDrawing = True   
 
-  newest = response[0]
-  sgv = newest['sgv']
+  sgv = newestEntry['sgv']
   sgvStr = str(sgv)
   #if sgv < 100: sgvStr = " " + sgvStr
 
-  directionStr = newest['direction']
-  sgvDateStr = newest['date']
+  directionStr = newestEntry['direction']
+  sgvDateStr = newestEntry['date']
   
   now_datetime = rtc.datetime()
   now = utime.mktime((now_datetime[0], now_datetime[1], now_datetime[2], now_datetime[4], now_datetime[5], now_datetime[6],0,0))  + secondsDiff
@@ -339,8 +338,8 @@ def printScreen(clear=False, noNetwork=False):
   #if emergency change to one of full modes 
   if emergency == True and (mode == 3 or mode == 7): currentMode = 0
   
-  if noNetwork == False and "ago" in newest and (currentMode == 0 or currentMode == 4): 
-    dateStr = newest['ago']
+  if noNetwork == False and "ago" in newestEntry and (currentMode == 0 or currentMode == 4): 
+    dateStr = newestEntry['ago']
   elif currentMode == 2 or currentMode == 6:
     if batteryLevel >= 0:
        dateStr = "Battery: " + str(batteryLevel) + "%"
@@ -570,7 +569,7 @@ def backendMonitor():
       if len(response) > 1: sgvDiff = sgv - response[1]['sgv']
       print('Sgv diff from previous read:', sgvDiff)
 
-      printScreen()
+      printScreen(response[0])
       
       nextCheck = INTERVAL
       #if read older than 4 mins increase frequency
@@ -592,7 +591,13 @@ def backendMonitor():
       sys.print_exception(e)
       print('Battery level: ' + str(getBatteryLevel()) + '%')
       if response == None: readResponseFile()
-      if response != None: printScreen(noNetwork=True)
+      try: 
+        if response != None and len(response) >= 1: 
+          printScreen(response[0], noNetwork=True)
+        else:
+          printCenteredText("Network error! Please wait.", backgroundColor=lcd.RED, clear=True)
+      except Exception as e:
+        sys.print_exception(e)
       print('Network error. Retry in ' + str(backendRetry) + ' secs ...')
       time.sleep(backendRetry)
 
@@ -675,10 +680,10 @@ def mpuCallback(t):
   global mpu, mode, response
   acceleration = mpu.acceleration
   hasResponse = (response != None)
-  if hasResponse and acceleration[1] < -0.1 and mode in range(0,3): mode += 4; printScreen(clear=True) #change to 'Flip mode' #4,5,6
-  elif hasResponse and acceleration[1] > 0.1 and mode in range(4,7): mode -= 4; printScreen(clear=True) #change to 'Normal mode' #0,1,2
-  elif hasResponse and acceleration[1] < -0.1 and mode == 7: mode = 8; printScreen(clear=True)
-  elif hasResponse and acceleration[1] > 0.1 and mode == 8: mode = 7; printScreen(clear=True)
+  if hasResponse and acceleration[1] < -0.1 and mode in range(0,3): mode += 4; printScreen(response[0], clear=True) #change to 'Flip mode' #4,5,6
+  elif hasResponse and acceleration[1] > 0.1 and mode in range(4,7): mode -= 4; printScreen(response[0], clear=True) #change to 'Normal mode' #0,1,2
+  elif hasResponse and acceleration[1] < -0.1 and mode == 7: mode = 8; printScreen(response[0], clear=True)
+  elif hasResponse and acceleration[1] > 0.1 and mode == 8: mode = 7; printScreen(response[0], clear=True)
   #print("Acc:", str(acceleration))
 
 def touchPadCallback(t):
@@ -819,7 +824,7 @@ print("")
 printCenteredText("Setting time...", backgroundColor=lcd.DARKGREY) #lcd.GREENYELLOW)
 
 try: 
-  rtc.settime('ntp', host='pool.ntp.org', tzone=0) #UTC 
+  rtc.settime('ntp', host='pool.ntp.org', tzone=1) #UTC 
   print("Current UTC datetime " +  str(rtc.datetime()))
   startTime = utime.time()
 except Exception as e:
