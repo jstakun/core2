@@ -25,6 +25,8 @@ MODES = ["full_elapsed", "full_date", "full_battery", "basic", "flip_full_elapse
 SGVDICT_FILE = 'sgvdict.txt'
 RESPONSE_FILE = 'response.txt'
 
+printScreenLock = _thread.allocate_lock()
+
 def getBatteryLevel():
   volt = power.getBatVoltage()
   if volt < 3.20: return -1
@@ -273,20 +275,19 @@ def drawTriangle(centerX, centerY, arrowColor, rotateAngle=90, width=44, height=
   return x1r, y1r, x2r, y2r, x3r, y3r 
 
 def printScreen(newestEntry, clear=False, noNetwork=False):
-  global response, mode, brightness, emergency, emergencyPause, MIN, MAX, EMERGENCY_MIN, EMERGENCY_MAX, screenDrawing, startTime, rgbUnit, secondsDiff, OLD_DATA, OLD_DATA_EMERGENCY, headerColor, middleColor, footerColor, prevDateStr, prevSgvDiffStr, prevBatteryStr, prevTimeStr, prevSgvStr, prevX, prevY, prevDirectionStr 
+  print('Printing screen requested');
+  with printScreenLock:
+    printScreenInternal(newestEntry, clear, noNetwork)
+
+def printScreenInternal(newestEntry, clear=False, noNetwork=False):
+  global response, mode, brightness, emergency, emergencyPause, MIN, MAX, EMERGENCY_MIN, EMERGENCY_MAX, startTime, rgbUnit, secondsDiff, OLD_DATA, OLD_DATA_EMERGENCY, headerColor, middleColor, footerColor, prevDateStr, prevSgvDiffStr, prevBatteryStr, prevTimeStr, prevSgvStr, prevX, prevY, prevDirectionStr 
   #320*240
+  
+  currentMode = mode
+
   s = utime.time()
-  print('Printing screen in ' + MODES[mode] + ' mode')
-  waitTime = 0.0
-  while screenDrawing == True:
-    time.sleep(0.1)
-    waitTime += 0.1
-    print(".", end="")
-
-  if waitTime > 0: 
-    print('Finished in ' + str(waitTime) + ' seconds')
-  screenDrawing = True   
-
+  print('Printing screen in ' + MODES[currentMode] + ' mode')
+  
   sgv = newestEntry['sgv']
   sgvStr = str(sgv)
   #if sgv < 100: sgvStr = " " + sgvStr
@@ -314,8 +315,6 @@ def printScreen(newestEntry, clear=False, noNetwork=False):
   elif sgv > MAX and sgv <= EMERGENCY_MAX: backgroundColor=lcd.ORANGE; emergency=False
   elif sgv > EMERGENCY_MAX: backgroundColor=lcd.ORANGE; emergency=(utime.time() > emergencyPause and not tooOld)  
   
-  currentMode = mode
-
   #battery level emergency
   batteryLevel = getBatteryLevel()
   uptime = utime.time() - startTime  
@@ -336,7 +335,7 @@ def printScreen(newestEntry, clear=False, noNetwork=False):
     rgbUnit.setColor(3, lcd.BLACK)
 
   #if emergency change to one of full modes 
-  if emergency == True and (mode == 3 or mode == 7): currentMode = 0
+  if emergency == True and (currentMode == 3 or currentMode == 7): currentMode = 0
   
   if noNetwork == False and "ago" in newestEntry and (currentMode == 0 or currentMode == 4): 
     dateStr = newestEntry['ago']
@@ -546,7 +545,6 @@ def printScreen(newestEntry, clear=False, noNetwork=False):
       prevDateStr = dateStr
 
   print("Printing screen finished in " + str((utime.time() - s)) + " secs ...")
-  screenDrawing = False 
 
 def backendMonitor():
   global response, INTERVAL, API_ENDPOINT, API_TOKEN, LOCALE, TIMEZONE, startTime, sgvDict, secondsDiff
@@ -583,7 +581,8 @@ def backendMonitor():
         else: nextCheck=INTERVAL/2 
       print('Next backend call in ' + str(nextCheck) + " secs ...")
 
-      _thread.start_new_thread(persistEntries, ()) 
+      #_thread.start_new_thread(persistEntries, ())
+      persistEntries() 
       
       print('---------------------------')
       time.sleep(nextCheck)
@@ -676,7 +675,12 @@ def emergencyMonitor():
       #print('No emergency status')
       time.sleep(2)
 
-def mpuCallback(t):
+def mpuMonitor():
+  while True:
+    mpuAction()
+    time.sleep(0.5)
+
+def mpuAction():
   global mpu, mode, response
   acceleration = mpu.acceleration
   hasResponse = (response != None)
@@ -684,7 +688,9 @@ def mpuCallback(t):
   elif hasResponse and acceleration[1] > 0.1 and mode in range(4,7): mode -= 4; printScreen(response[0], clear=True) #change to 'Normal mode' #0,1,2
   elif hasResponse and acceleration[1] < -0.1 and mode == 7: mode = 8; printScreen(response[0], clear=True)
   elif hasResponse and acceleration[1] > 0.1 and mode == 8: mode = 7; printScreen(response[0], clear=True)
-  #print("Acc:", str(acceleration))
+
+def mpuCallback(t):
+  mpuAction()
 
 def touchPadCallback(t):
   if touch.status() == True:
@@ -728,7 +734,6 @@ print('Machine unique id:', machine_id.decode())
 response = None
 emergency = False
 emergencyPause = 0
-screenDrawing = False
 mode = 0
   
 headerColor = None
@@ -843,13 +848,14 @@ print('Loaded ' + str(dictLen) + " sgv entries")
 
 _thread.start_new_thread(backendMonitor, ())
 _thread.start_new_thread(emergencyMonitor, ())
+_thread.start_new_thread(mpuMonitor, ())
 
 btnA.wasPressed(onBtnPressed)
 btnB.wasPressed(onBtnPressed)
 btnC.wasPressed(onBtnPressed)
 
-mpuTimer = machine.Timer(1)
-mpuTimer.init(period=500, callback=mpuCallback)
+touchPadTimer = machine.Timer(1)
+touchPadTimer.init(period=100, callback=touchPadCallback)
 
-touchPadTimer = machine.Timer(2)
-touchPadTimer.init(period=50, callback=touchPadCallback)
+#mpuTimer = machine.Timer(2)
+#mpuTimer.init(period=500, callback=mpuCallback)
