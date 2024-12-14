@@ -10,7 +10,7 @@ import sys
 import deviceCfg
 import wifiCfg
 import machine
-import ubinascii
+#import ubinascii
 import urequests
 import _thread
 import utime
@@ -24,6 +24,7 @@ EMERGENCY_PAUSE_INTERVAL = 1800  #sec = 30 mins
 MODES = ["full_elapsed", "full_date", "full_battery", "basic", "flip_full_elapsed", "flip_full_date", "flip_full_battery", "chart", "flip_chart"]
 SGVDICT_FILE = 'sgvdict.txt'
 RESPONSE_FILE = 'response.txt'
+BACKEND_TIMEOUT_MS = 60000
 
 printScreenLock = _thread.allocate_lock()
 
@@ -134,6 +135,7 @@ def persistEntries():
     the_date = getDateTuple(entry['date'])  
     seconds = utime.mktime(the_date)
     d.update({seconds: entry['sgv']})
+  gc.collect()  
 
   dictLen = len(d)  
   for key in sgvDict:
@@ -548,44 +550,30 @@ def printScreenInternal(newestEntry, clear=False, noNetwork=False):
 
 def backendMonitor():
   global response, INTERVAL, API_ENDPOINT, API_TOKEN, LOCALE, TIMEZONE, startTime, sgvDict, secondsDiff
-  backendRetry = math.ceil(INTERVAL/4)
+  lastid = -1
   while True:
     try:
       print('Battery level: ' + str(getBatteryLevel()) + '%')
       print('Free memory: ' + str(gc.mem_free()) + ' bytes')
+      print('Allocated memory: ' + str(gc.mem_alloc() + ' bytes')
       printTime((utime.time() - startTime), prefix='Uptime is')
       print('Calling backend ...')
       s = utime.time()
-      response = urequests.get(API_ENDPOINT + "/entries.json?count=10",headers={'api-secret': API_TOKEN,'accept-language': LOCALE,'accept-charset': 'ascii', 'x-gms-tz': TIMEZONE}).json()
+      response = urequests.get(API_ENDPOINT + "/entries.json?count=10&waitfornextid=" + str(lastid) + "&timeout=" + str(BACKEND_TIMEOUT_MS), headers={'api-secret': API_TOKEN,'accept-language': LOCALE,'accept-charset': 'ascii', 'x-gms-tz': TIMEZONE}).json()
       printTime((utime.time() - s), prefix='Response received in')
       sgv = response[0]['sgv']
       sgvDate = response[0]['date']
+      lastid = response[0]['id']
       print('Sgv:', sgv)
       print('Direction:', response[0]['direction'])
       print('Read: ' + sgvDate + ' (' + TIMEZONE + ')')
       sgvDiff = 0
       if len(response) > 1: sgvDiff = sgv - response[1]['sgv']
       print('Sgv diff from previous read:', sgvDiff)
-
       printScreen(response[0])
-      
-      nextCheck = INTERVAL
-      #if read older than 4 mins increase frequency
-      now_datetime = rtc.datetime()
-      now = utime.mktime((now_datetime[0], now_datetime[1], now_datetime[2], now_datetime[4], now_datetime[5], now_datetime[6],0,0))  + secondsDiff
-      if isOlderThan(sgvDate, 4, now):
-        if sgv <= EMERGENCY_MIN: nextCheck=INTERVAL/6
-        elif sgv > EMERGENCY_MIN and sgv < MIN: nextCheck=INTERVAL/5
-        elif sgv > MAX and sgv <= EMERGENCY_MAX: nextCheck=INTERVAL/3
-        elif sgv > EMERGENCY_MAX: nextCheck=INTERVAL/4
-        else: nextCheck=INTERVAL/2 
-      print('Next backend call in ' + str(nextCheck) + " secs ...")
-
-      #_thread.start_new_thread(persistEntries, ())
-      persistEntries() 
-      
+      _thread.start_new_thread(persistEntries, ())
+      #persistEntries() 
       print('---------------------------')
-      time.sleep(nextCheck)
     except Exception as e:
       sys.print_exception(e)
       print('Battery level: ' + str(getBatteryLevel()) + '%')
@@ -597,8 +585,8 @@ def backendMonitor():
           printCenteredText("Network error! Please wait.", backgroundColor=lcd.RED, clear=True)
       except Exception as e:
         sys.print_exception(e)
-      print('Network error. Retry in ' + str(backendRetry) + ' secs ...')
-      time.sleep(backendRetry)
+      print('Backend call error. Retry in 10 secs ...')
+      time.sleep(10)
 
 def emergencyMonitor():
   global emergency, response, rgbUnit, EMERGENCY_MAX, EMERGENCY_MIN, OLD_DATA_EMERGENCY
@@ -830,8 +818,12 @@ printCenteredText("Setting time...", backgroundColor=lcd.DARKGREY) #lcd.GREENYEL
 
 try: 
   rtc.settime('ntp', host='pool.ntp.org', tzone=1) #UTC 
-  print("Current UTC datetime " +  str(rtc.datetime()))
-  startTime = utime.time()
+  now_datetime = rtc.datetime() 
+  if now_datetime[0] < 2024: 
+    raise ValueError('Invalid datetime: ' + str(now_datetime))
+  else:                                              
+    print("Current UTC datetime " +  str(now_datetime))
+    startTime = utime.time()
 except Exception as e:
   sys.print_exception(e)
   while True:
@@ -846,7 +838,7 @@ sgvDict = readSgvFile()
 dictLen = len(sgvDict)
 print('Loaded ' + str(dictLen) + " sgv entries")
 
-_thread.start_new_thread(backendMonitor, ())
+#_thread.start_new_thread(backendMonitor, ())
 _thread.start_new_thread(emergencyMonitor, ())
 _thread.start_new_thread(mpuMonitor, ())
 
@@ -859,3 +851,5 @@ touchPadTimer.init(period=100, callback=touchPadCallback)
 
 #mpuTimer = machine.Timer(2)
 #mpuTimer.init(period=500, callback=mpuCallback)
+
+backendMonitor()
