@@ -555,7 +555,7 @@ def backendMonitor():
     try:
       print('Battery level: ' + str(getBatteryLevel()) + '%')
       print('Free memory: ' + str(gc.mem_free()) + ' bytes')
-      print('Allocated memory: ' + str(gc.mem_alloc() + ' bytes')
+      print('Allocated memory: ' + str(gc.mem_alloc()) + ' bytes')
       printTime((utime.time() - startTime), prefix='Uptime is')
       print('Calling backend ...')
       s = utime.time()
