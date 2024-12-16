@@ -552,6 +552,7 @@ def backendMonitor():
   global response, INTERVAL, API_ENDPOINT, API_TOKEN, LOCALE, TIMEZONE, startTime, sgvDict, secondsDiff
   lastid = -1
   while True:
+    wdt = machine.WDT(timeout=BACKEND_TIMEOUT_MS+10000)
     try:
       print('Battery level: ' + str(getBatteryLevel()) + '%')
       print('Free memory: ' + str(gc.mem_free()) + ' bytes')
@@ -573,7 +574,6 @@ def backendMonitor():
       printScreen(response[0])
       _thread.start_new_thread(persistEntries, ())
       #persistEntries() 
-      print('---------------------------')
     except Exception as e:
       sys.print_exception(e)
       print('Battery level: ' + str(getBatteryLevel()) + '%')
@@ -587,7 +587,9 @@ def backendMonitor():
         sys.print_exception(e)
       print('Backend call error. Retry in 10 secs ...')
       time.sleep(10)
-
+    print('---------------------------')
+    wdt.feed()
+      
 def emergencyMonitor():
   global emergency, response, rgbUnit, EMERGENCY_MAX, EMERGENCY_MIN, OLD_DATA_EMERGENCY
   vibrate = False
