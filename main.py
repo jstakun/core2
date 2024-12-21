@@ -549,7 +549,7 @@ def printScreenInternal(newestEntry, clear=False, noNetwork=False):
   print("Printing screen finished in " + str((utime.time() - s)) + " secs ...")
 
 def backendMonitor():
-  global response, INTERVAL, API_ENDPOINT, API_TOKEN, LOCALE, TIMEZONE, startTime, sgvDict, secondsDiff
+  global response, INTERVAL, API_ENDPOINT, API_TOKEN, LOCALE, TIMEZONE, startTime, sgvDict, secondsDiff, backendResponseTimer
   lastid = -1
   while True:
     try:
@@ -559,7 +559,9 @@ def backendMonitor():
       printTime((utime.time() - startTime), prefix='Uptime is')
       print('Calling backend ...')
       s = utime.time()
+      backendResponseTimer.init(mode=machine.Timer.ONE_SHOT, period=BACKEND_TIMEOUT_MS+5000, callback=watchdogCallback)
       response = urequests.get(API_ENDPOINT + "/entries.json?count=10&waitfornextid=" + str(lastid) + "&timeout=" + str(BACKEND_TIMEOUT_MS), headers={'api-secret': API_TOKEN,'accept-language': LOCALE,'accept-charset': 'ascii', 'x-gms-tz': TIMEZONE}).json()
+      backendResponseTimer.deinit()
       printTime((utime.time() - s), prefix='Response received in')
       sgv = response[0]['sgv']
       sgvDate = response[0]['date']
@@ -574,6 +576,7 @@ def backendMonitor():
       _thread.start_new_thread(persistEntries, ())
       #persistEntries() 
     except Exception as e:
+      backendResponseTimer.deinit()
       sys.print_exception(e)
       print('Battery level: ' + str(getBatteryLevel()) + '%')
       if response == None: readResponseFile()
@@ -688,6 +691,10 @@ def touchPadCallback(t):
     print("Touch screen pressed at " + str(tx) + "," + str(ty))
     onBtnPressed()
 
+def watchdogCallback(t):
+  print('Restarting device ...')
+  machine.WDT(timeout=1000)   
+
 def onBtnPressed():
   global emergency, emergencyPause
   if emergency == True:
@@ -709,7 +716,7 @@ screen.set_screen_brightness(brightness)
 
 lcd.clear(lcd.DARKGREY)
 
-print('Starting...')
+print('Starting ...')
 print('APIKEY:',deviceCfg.get_apikey())
 print('Board name:', deviceCfg.get_board_name())
 macaddr=wifiCfg.wlan_sta.config('mac')
@@ -792,7 +799,7 @@ except Exception as e:
 nic = network.WLAN(network.STA_IF)
 nic.active(True)
 
-printCenteredText("Scanning wifi...", backgroundColor=lcd.DARKGREY)
+printCenteredText("Scanning wifi ...", backgroundColor=lcd.DARKGREY)
 
 found = False
 while not found:
@@ -829,7 +836,7 @@ except Exception as e:
   #while True:
   printCenteredText("Failed to set time!", backgroundColor=lcd.RED, clear=True)
   time.sleep(2)
-  machine.WDT(2000)
+  machine.WDT(timeout=1000)
   printCenteredText("Restarting...", backgroundColor=lcd.RED, clear=True)
   #time.sleep(2)  
 
@@ -850,7 +857,9 @@ btnC.wasPressed(onBtnPressed)
 touchPadTimer = machine.Timer(1)
 touchPadTimer.init(period=100, callback=touchPadCallback)
 
-#mpuTimer = machine.Timer(2)
+backendResponseTimer = machine.Timer(2)
+
+#mpuTimer = machine.Timer(3)
 #mpuTimer.init(period=500, callback=mpuCallback)
 
 backendMonitor()
