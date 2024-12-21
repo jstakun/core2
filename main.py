@@ -559,7 +559,7 @@ def backendMonitor():
       printTime((utime.time() - startTime), prefix='Uptime is')
       print('Calling backend ...')
       s = utime.time()
-      backendResponseTimer.init(mode=machine.Timer.ONE_SHOT, period=BACKEND_TIMEOUT_MS+5000, callback=watchdogCallback)
+      backendResponseTimer.init(mode=machine.Timer.ONE_SHOT, period=BACKEND_TIMEOUT_MS+10000, callback=watchdogCallback)
       response = urequests.get(API_ENDPOINT + "/entries.json?count=10&waitfornextid=" + str(lastid) + "&timeout=" + str(BACKEND_TIMEOUT_MS), headers={'api-secret': API_TOKEN,'accept-language': LOCALE,'accept-charset': 'ascii', 'x-gms-tz': TIMEZONE}).json()
       backendResponseTimer.deinit()
       printTime((utime.time() - s), prefix='Response received in')
@@ -838,7 +838,8 @@ except Exception as e:
   time.sleep(2)
   machine.WDT(timeout=1000)
   printCenteredText("Restarting...", backgroundColor=lcd.RED, clear=True)
-  #time.sleep(2)  
+  print('Restarting device ...')    
+  time.sleep(60) #wait until watchdog restarts device  
 
 printCenteredText("Loading data...", backgroundColor=lcd.DARKGREY) #lcd.DARKGREEN)
 
