@@ -147,7 +147,6 @@ def persistEntries():
   sgvDict = d
   saveSgvFile(d)
   print('Persisted ' + str(dictLen) + " sgv entries")
-      
 
 def checkBeeper():
   global USE_BEEPER, BEEPER_START_TIME, BEEPER_END_TIME, secondsDiff 
@@ -206,20 +205,22 @@ def printCenteredText(msg, font=lcd.FONT_DejaVu24, backgroundColor=lcd.BLACK, te
   lcd.fillRect(0, math.ceil(120-f[1]/2), 320, math.ceil(f[1]), backgroundColor)
   lcd.print(msg, x, y)
 
-def printText(msg, x, y, cleanupMsg, font=lcd.FONT_DejaVu24, backgroundColor=lcd.BLACK, textColor=lcd.WHITE, clear=True, rotate=0, cleanupX=None):
+def printText(msg, x, y, cleanupMsg, font=lcd.FONT_DejaVu24, backgroundColor=lcd.BLACK, textColor=lcd.WHITE, clear=True, rotate=0, cleanupX=None, silent=False):
   lcd.font(font, rotate=rotate)
   if clear == True and cleanupMsg != None:
      if cleanupX == None: cleanupX = x
      w = lcd.textWidth(cleanupMsg)
      f = lcd.fontSize()
-     print("Clearing " + cleanupMsg + ": " + str(cleanupX) + "," + str(y))
+     if silent == False: 
+       print("Clearing " + cleanupMsg + ": " + str(cleanupX) + "," + str(y))
      if rotate == 0:
-        lcd.fillRect(cleanupX, math.ceil(y), math.ceil(w), math.ceil(f[1]), backgroundColor)
+       lcd.fillRect(cleanupX, math.ceil(y), math.ceil(w), math.ceil(f[1]), backgroundColor)
      else:   
-        lcd.fillRect(math.ceil(cleanupX-w), math.ceil(y-f[1]), math.ceil(w), math.ceil(f[1]), backgroundColor)
+       lcd.fillRect(math.ceil(cleanupX-w), math.ceil(y-f[1]), math.ceil(w), math.ceil(f[1]), backgroundColor)
   lcd.setTextColor(textColor)
   lcd.print(msg, x, y)
-  print("Printing " + msg)
+  if silent == False:
+    print("Printing " + msg)
 
 def printDirection(x, y, directionStr, xshift=0, yshift=0, rotateAngle=0, arrowColor=lcd.WHITE, fillColor=lcd.WHITE, backgroundColor=lcd.BLACK):
   global oldX, prevY, prevDirectionStr
@@ -275,7 +276,7 @@ def drawTriangle(centerX, centerY, arrowColor, rotateAngle=90, width=44, height=
   #lcd.triangle(int(x1r), int(y1r), int(x2r), int(y2r), int(x3r), int(y3r), fillcolor=arrowColor, color=arrowColor)
   return x1r, y1r, x2r, y2r, x3r, y3r 
 
-def printLocaltime(localtime=None, clear=False):
+def printLocaltime(localtime=None, clear=False, silent=False):
   global prevTimeStr, mode, secondsDiff
   if localtime == None:
     now_datetime = rtc.datetime()
@@ -294,9 +295,9 @@ def printLocaltime(localtime=None, clear=False):
       locked = printScreenLock.acquire()
     if locked == True or clear == True:
       if mode in range (0,3):
-        printText(timeStr, 10, 12, prevTimeStr, font=lcd.FONT_DejaVu18, backgroundColor=lcd.DARKGREY)  
+        printText(timeStr, 10, 12, prevTimeStr, font=lcd.FONT_DejaVu18, backgroundColor=lcd.DARKGREY, silent=silent)  
       elif mode in range (4,7):
-        printText(timeStr, 307, 222, prevTimeStr, font=lcd.FONT_DejaVu18, backgroundColor=lcd.DARKGREY, rotate=180)  
+        printText(timeStr, 307, 222, prevTimeStr, font=lcd.FONT_DejaVu18, backgroundColor=lcd.DARKGREY, rotate=180, silent=silent)  
       prevTimeStr = timeStr 
       if clear == False and locked == True:
         printScreenLock.release()
@@ -710,8 +711,7 @@ def watchdogCallback(t):
   machine.WDT(timeout=1000)   
 
 def locatimeCallback(t):
-  #print('Updating localtime ...')
-  printLocaltime()
+  printLocaltime(silent=True)
 
 def onBtnPressed():
   global emergency, emergencyPause
@@ -881,7 +881,7 @@ backendResponseTimer = machine.Timer(2)
 localtimeTimer = machine.Timer(3)
 localtimeTimer.init(period=1000, callback=locatimeCallback)
 
-#used mpuMonitor thread instead
+#using mpuMonitor thread instead
 #mpuTimer = machine.Timer(4)
 #mpuTimer.init(period=500, callback=mpuCallback)
 
