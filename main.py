@@ -10,7 +10,6 @@ import sys
 import deviceCfg
 import wifiCfg
 import machine
-#import ubinascii
 import urequests
 import _thread
 import utime
@@ -276,8 +275,32 @@ def drawTriangle(centerX, centerY, arrowColor, rotateAngle=90, width=44, height=
   #lcd.triangle(int(x1r), int(y1r), int(x2r), int(y2r), int(x3r), int(y3r), fillcolor=arrowColor, color=arrowColor)
   return x1r, y1r, x2r, y2r, x3r, y3r 
 
+def printLocaltime(localtime=None):
+  with printScreenLock:
+    printLocaltimeInternal(localtime)
+
+def printLocaltimeInternal(localtime=None):
+  global prevTimeStr, mode, secondsDiff
+  if localtime == None:
+    now_datetime = rtc.datetime()
+    now = utime.mktime((now_datetime[0], now_datetime[1], now_datetime[2], now_datetime[4], now_datetime[5], now_datetime[6],0,0))  + secondsDiff
+    localtime = utime.localtime(now)
+  h = str(localtime[3])
+  if (localtime[3] < 10): h = "0" + h   
+  m = str(localtime[4])
+  if (localtime[4] < 10): m = "0" + m
+  s = str(localtime[5])
+  if (localtime[5] < 10): s = "0" + s
+  timeStr = h + ":" + m + ":" + s
+  if timeStr != prevTimeStr:
+    if mode in range (0,3):
+      printText(timeStr, 10, 12, prevTimeStr, font=lcd.FONT_DejaVu18, backgroundColor=lcd.DARKGREY)  
+    elif mode in range (4,7):
+      printText(timeStr, 307, 222, prevTimeStr, font=lcd.FONT_DejaVu18, backgroundColor=lcd.DARKGREY, rotate=180)  
+    prevTimeStr = timeStr 
+
 def printScreen(newestEntry, clear=False, noNetwork=False):
-  print('Printing screen requested');
+  print('Printing screen requested')
   with printScreenLock:
     printScreenInternal(newestEntry, clear, noNetwork)
 
@@ -292,8 +315,7 @@ def printScreenInternal(newestEntry, clear=False, noNetwork=False):
   
   sgv = newestEntry['sgv']
   sgvStr = str(sgv)
-  #if sgv < 100: sgvStr = " " + sgvStr
-
+  
   directionStr = newestEntry['direction']
   sgvDateStr = newestEntry['date']
   
@@ -349,14 +371,6 @@ def printScreenInternal(newestEntry, clear=False, noNetwork=False):
   else:   
     dateStr = sgvDateStr.replace("T", " ")[:-3] #remove seconds
   
-  h = str(localtime[3])
-  if (localtime[3] < 10): h = "0" + h   
-  m = str(localtime[4])
-  if (localtime[4] < 10): m = "0" + m
-  #s = str(localtime[5])
-  #if (localtime[5] < 10): s = "0" + s
-  timeStr = h + ":" + m
-
   if not tooOld and directionStr == 'DoubleUp' and sgv+20>=MAX and sgv<MAX: arrowColor = lcd.ORANGE
   elif not tooOld and directionStr == 'DoubleUp' and sgv>=MAX: arrowColor = lcd.RED
   elif not tooOld and directionStr == 'DoubleDown' and sgv-20<=MIN: arrowColor = lcd.RED
@@ -423,11 +437,10 @@ def printScreenInternal(newestEntry, clear=False, noNetwork=False):
     elif directionStr == 'FortyFiveUp': printDirection(x, y, directionStr, xshift=4, yshift=-4, rotateAngle=-45, arrowColor=arrowColor, backgroundColor=backgroundColor)
     elif directionStr == 'FortyFiveDown': printDirection(x, y, directionStr, xshift=4, yshift=4, rotateAngle=45, arrowColor=arrowColor, backgroundColor=backgroundColor)
 
-    #draw current time
     lcd.font(lcd.FONT_DejaVu18)
-    if timeStr != prevTimeStr:
-      printText(timeStr, 10, 12, prevTimeStr, font=lcd.FONT_DejaVu18, backgroundColor=lcd.DARKGREY)  
-      prevTimeStr = timeStr 
+    
+    #draw current time
+    printLocaltimeInternal(localtime)
 
     #draw battery
     if batteryStr != prevBatteryStr:
@@ -499,11 +512,10 @@ def printScreenInternal(newestEntry, clear=False, noNetwork=False):
     elif directionStr == 'FortyFiveUp': printDirection(x, y, directionStr, xshift=-4, yshift=4, rotateAngle=135, arrowColor=arrowColor, backgroundColor=backgroundColor)
     elif directionStr == 'FortyFiveDown': printDirection(x, y, directionStr, xshift=-4, yshift=-4, rotateAngle=-135, arrowColor=arrowColor, backgroundColor=backgroundColor)
   
-    #draw current time
     lcd.font(lcd.FONT_DejaVu18)
-    if timeStr != prevTimeStr:
-      printText(timeStr, 307, 222, prevTimeStr, font=lcd.FONT_DejaVu18, backgroundColor=lcd.DARKGREY, rotate=180)  
-      prevTimeStr = timeStr
+    
+    #draw current time
+    printLocaltimeInternal(localtime)
 
     #draw battery
     if batteryStr != prevBatteryStr:
@@ -695,6 +707,10 @@ def watchdogCallback(t):
   print('Restarting device ...')
   machine.WDT(timeout=1000)   
 
+def locatimeCallback(t):
+  #print('Updating localtime ...')
+  printLocaltimeInternal()
+
 def onBtnPressed():
   global emergency, emergencyPause
   if emergency == True:
@@ -845,7 +861,7 @@ printCenteredText("Loading data...", backgroundColor=lcd.DARKGREY) #lcd.DARKGREE
 
 sgvDict = readSgvFile()
 dictLen = len(sgvDict)
-print('Loaded ' + str(dictLen) + " sgv entries")
+print("Loaded " + str(dictLen) + " sgv entries")
 
 #_thread.start_new_thread(backendMonitor, ())
 _thread.start_new_thread(emergencyMonitor, ())
@@ -859,8 +875,12 @@ touchPadTimer = machine.Timer(1)
 touchPadTimer.init(period=100, callback=touchPadCallback)
 
 backendResponseTimer = machine.Timer(2)
+  
+localtimeTimer = machine.Timer(3)
+localtimeTimer.init(period=1000, callback=locatimeCallback)
 
-#mpuTimer = machine.Timer(3)
+#used mpuMonitor thread instead
+#mpuTimer = machine.Timer(4)
 #mpuTimer.init(period=500, callback=mpuCallback)
 
 backendMonitor()
