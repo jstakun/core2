@@ -275,11 +275,7 @@ def drawTriangle(centerX, centerY, arrowColor, rotateAngle=90, width=44, height=
   #lcd.triangle(int(x1r), int(y1r), int(x2r), int(y2r), int(x3r), int(y3r), fillcolor=arrowColor, color=arrowColor)
   return x1r, y1r, x2r, y2r, x3r, y3r 
 
-def printLocaltime(localtime=None):
-  with printScreenLock:
-    printLocaltimeInternal(localtime)
-
-def printLocaltimeInternal(localtime=None):
+def printLocaltime(localtime=None, clear=False):
   global prevTimeStr, mode, secondsDiff
   if localtime == None:
     now_datetime = rtc.datetime()
@@ -293,18 +289,19 @@ def printLocaltimeInternal(localtime=None):
   if (localtime[5] < 10): s = "0" + s
   timeStr = h + ":" + m + ":" + s
   if timeStr != prevTimeStr:
-    if mode in range (0,3):
-      printText(timeStr, 10, 12, prevTimeStr, font=lcd.FONT_DejaVu18, backgroundColor=lcd.DARKGREY)  
-    elif mode in range (4,7):
-      printText(timeStr, 307, 222, prevTimeStr, font=lcd.FONT_DejaVu18, backgroundColor=lcd.DARKGREY, rotate=180)  
-    prevTimeStr = timeStr 
+    locked = False 
+    if clear == False and printScreenLock.locked() == False:
+      locked = printScreenLock.acquire()
+    if locked == True or clear == True:
+      if mode in range (0,3):
+        printText(timeStr, 10, 12, prevTimeStr, font=lcd.FONT_DejaVu18, backgroundColor=lcd.DARKGREY)  
+      elif mode in range (4,7):
+        printText(timeStr, 307, 222, prevTimeStr, font=lcd.FONT_DejaVu18, backgroundColor=lcd.DARKGREY, rotate=180)  
+      prevTimeStr = timeStr 
+      if clear == False and locked == True:
+        printScreenLock.release()
 
 def printScreen(newestEntry, clear=False, noNetwork=False):
-  print('Printing screen requested')
-  with printScreenLock:
-    printScreenInternal(newestEntry, clear, noNetwork)
-
-def printScreenInternal(newestEntry, clear=False, noNetwork=False):
   global response, mode, brightness, emergency, emergencyPause, MIN, MAX, EMERGENCY_MIN, EMERGENCY_MAX, startTime, rgbUnit, secondsDiff, OLD_DATA, OLD_DATA_EMERGENCY, headerColor, middleColor, footerColor, prevDateStr, prevSgvDiffStr, prevBatteryStr, prevTimeStr, prevSgvStr, prevX, prevY, prevDirectionStr 
   #320*240
   
@@ -398,167 +395,172 @@ def printScreenInternal(newestEntry, clear=False, noNetwork=False):
     prevTimeStr = None 
     prevSgvStr = None
     
-  if headerColor != lcd.DARKGREY:
-    headerColor = lcd.DARKGREY
-    lcd.fillRect(0, 0, 360, 40, lcd.DARKGREY)
-  if backgroundColor != middleColor:
-    middleColor = backgroundColor 
-    lcd.fillRect(0, 40, 360, 160, backgroundColor)
-    prevDirectionStr = None
-    prevSgvStr = None
-  if footerColor != lcd.DARKGREY:
-    footerColor = lcd.DARKGREY     
-    lcd.fillRect(0, 200, 360, 40, lcd.DARKGREY)
+  locked = printScreenLock.acquire()
 
-  if currentMode in range (0,3):  
+  if locked == True: 
+    if headerColor != lcd.DARKGREY:
+      headerColor = lcd.DARKGREY
+      lcd.fillRect(0, 0, 360, 40, lcd.DARKGREY)
+    if backgroundColor != middleColor:
+      middleColor = backgroundColor 
+      lcd.fillRect(0, 40, 360, 160, backgroundColor)
+      prevDirectionStr = None
+      prevSgvStr = None
+    if footerColor != lcd.DARKGREY:
+      footerColor = lcd.DARKGREY     
+      lcd.fillRect(0, 200, 360, 40, lcd.DARKGREY)
 
-    #draw sgv 
-    lcd.font(lcd.FONT_DejaVu72)
-    w = lcd.textWidth(sgvStr)
-    x = math.ceil((320 - w - 20 - 80) / 2)
-    y = 120 - 36 - 8
-    if sgvStr != prevSgvStr:
-      if prevSgvStr != None: 
-        cleanupX = math.ceil((320 - lcd.textWidth(prevSgvStr) - 20 - 80) / 2)
-      else:
-        cleanupX = None 
-      printText(sgvStr, x, y, prevSgvStr, font=lcd.FONT_DejaVu72, backgroundColor=backgroundColor, cleanupX=cleanupX)
-      prevSgvStr = sgvStr
+    if currentMode in range (0,3):  
+ 
+      #draw sgv 
+      lcd.font(lcd.FONT_DejaVu72)
+      w = lcd.textWidth(sgvStr)
+      x = math.ceil((320 - w - 20 - 80) / 2)
+      y = 120 - 36 - 8
+      if sgvStr != prevSgvStr:
+        if prevSgvStr != None: 
+          cleanupX = math.ceil((320 - lcd.textWidth(prevSgvStr) - 20 - 80) / 2)
+        else:
+          cleanupX = None 
+        printText(sgvStr, x, y, prevSgvStr, font=lcd.FONT_DejaVu72, backgroundColor=backgroundColor, cleanupX=cleanupX)
+        prevSgvStr = sgvStr
 
-    #draw arrow
-    x += w + 20 + 40
-    y = 115 - 10
+      #draw arrow
+      x += w + 20 + 40
+      y = 115 - 10
     
-    if directionStr == 'DoubleUp': printDoubleDirection(x, y, directionStr, ytop=-12, ybottom=4, rotateAngle=-90, arrowColor=arrowColor, backgroundColor=backgroundColor)
-    elif directionStr == 'DoubleDown': printDoubleDirection(x, y, directionStr, ytop=-4, ybottom=12, rotateAngle=90, arrowColor=arrowColor, backgroundColor=backgroundColor) 
-    elif directionStr == 'SingleUp': printDirection(x, y, directionStr, xshift=0, yshift=-4, rotateAngle=-90, arrowColor=arrowColor, backgroundColor=backgroundColor)
-    elif directionStr == 'SingleDown': printDirection(x, y, directionStr, xshift=0, yshift=4, rotateAngle=90, arrowColor=arrowColor, backgroundColor=backgroundColor)
-    elif directionStr == 'Flat': printDirection(x, y, directionStr, xshift=4, rotateAngle=0, arrowColor=arrowColor, backgroundColor=backgroundColor)
-    elif directionStr == 'FortyFiveUp': printDirection(x, y, directionStr, xshift=4, yshift=-4, rotateAngle=-45, arrowColor=arrowColor, backgroundColor=backgroundColor)
-    elif directionStr == 'FortyFiveDown': printDirection(x, y, directionStr, xshift=4, yshift=4, rotateAngle=45, arrowColor=arrowColor, backgroundColor=backgroundColor)
+      if directionStr == 'DoubleUp': printDoubleDirection(x, y, directionStr, ytop=-12, ybottom=4, rotateAngle=-90, arrowColor=arrowColor, backgroundColor=backgroundColor)
+      elif directionStr == 'DoubleDown': printDoubleDirection(x, y, directionStr, ytop=-4, ybottom=12, rotateAngle=90, arrowColor=arrowColor, backgroundColor=backgroundColor) 
+      elif directionStr == 'SingleUp': printDirection(x, y, directionStr, xshift=0, yshift=-4, rotateAngle=-90, arrowColor=arrowColor, backgroundColor=backgroundColor)
+      elif directionStr == 'SingleDown': printDirection(x, y, directionStr, xshift=0, yshift=4, rotateAngle=90, arrowColor=arrowColor, backgroundColor=backgroundColor)
+      elif directionStr == 'Flat': printDirection(x, y, directionStr, xshift=4, rotateAngle=0, arrowColor=arrowColor, backgroundColor=backgroundColor)
+      elif directionStr == 'FortyFiveUp': printDirection(x, y, directionStr, xshift=4, yshift=-4, rotateAngle=-45, arrowColor=arrowColor, backgroundColor=backgroundColor)
+      elif directionStr == 'FortyFiveDown': printDirection(x, y, directionStr, xshift=4, yshift=4, rotateAngle=45, arrowColor=arrowColor, backgroundColor=backgroundColor)
 
-    lcd.font(lcd.FONT_DejaVu18)
+      lcd.font(lcd.FONT_DejaVu18)
     
-    #draw current time
-    printLocaltimeInternal(localtime)
+      #draw current time
+      printLocaltime(localtime, clear=True)
 
-    #draw battery
-    if batteryStr != prevBatteryStr:
-      textColor = lcd.WHITE
-      if batteryLevel < 20 and backgroundColor != lcd.RED: textColor = lcd.RED
-      w = lcd.textWidth(batteryStr)
-      if prevBatteryStr != None: 
-        cleanupX = math.ceil(320-5-lcd.textWidth(prevBatteryStr))
-      else:
-        cleanupX = None 
-      printText(batteryStr, math.ceil(320-5-w), 12, prevBatteryStr, font=lcd.FONT_DejaVu18, backgroundColor=lcd.DARKGREY, textColor=textColor, cleanupX=cleanupX) 
-      prevBatteryStr = batteryStr 
+      #draw battery
+      if batteryStr != prevBatteryStr:
+        textColor = lcd.WHITE
+        if batteryLevel < 20 and backgroundColor != lcd.RED: textColor = lcd.RED
+        w = lcd.textWidth(batteryStr)
+        if prevBatteryStr != None: 
+          cleanupX = math.ceil(320-5-lcd.textWidth(prevBatteryStr))
+        else:
+          cleanupX = None 
+        printText(batteryStr, math.ceil(320-5-w), 12, prevBatteryStr, font=lcd.FONT_DejaVu18, backgroundColor=lcd.DARKGREY, textColor=textColor, cleanupX=cleanupX) 
+        prevBatteryStr = batteryStr 
 
-    #draw sgv diff
-    if prevSgvDiffStr != sgvDiffStr:
-      textColor = lcd.WHITE
-      if math.fabs(sgvDiff) >= 10 and backgroundColor != lcd.RED and not tooOld: textColor = lcd.RED
-      w = lcd.textWidth(sgvDiffStr)
-      if prevSgvDiffStr != None: 
-        cleanupX = math.ceil((320-lcd.textWidth(prevSgvDiffStr))/2)
-      else:
-        cleanupX = None 
-      x = math.ceil((320-w)/2)
-      printText(sgvDiffStr, x, 12, prevSgvDiffStr, font=lcd.FONT_DejaVu18, backgroundColor=lcd.DARKGREY, textColor=textColor, cleanupX=cleanupX)
-      prevSgvDiffStr = sgvDiffStr
+      #draw sgv diff
+      if prevSgvDiffStr != sgvDiffStr:
+        textColor = lcd.WHITE
+        if math.fabs(sgvDiff) >= 10 and backgroundColor != lcd.RED and not tooOld: textColor = lcd.RED
+        w = lcd.textWidth(sgvDiffStr)
+        if prevSgvDiffStr != None: 
+          cleanupX = math.ceil((320-lcd.textWidth(prevSgvDiffStr))/2)
+        else:
+          cleanupX = None 
+        x = math.ceil((320-w)/2)
+        printText(sgvDiffStr, x, 12, prevSgvDiffStr, font=lcd.FONT_DejaVu18, backgroundColor=lcd.DARKGREY, textColor=textColor, cleanupX=cleanupX)
+        prevSgvDiffStr = sgvDiffStr
     
-    #draw dateStr
-    if dateStr != prevDateStr:
-      lcd.font(lcd.FONT_DejaVu24)
-      textColor = lcd.WHITE
-      if isOlderThan(sgvDateStr, 10, now): 
-        textColor = lcd.RED
-      w = lcd.textWidth(dateStr)
-      x = math.ceil((320-w)/2)
-      y = 240-24-5
-      if prevDateStr != None: 
-        cleanupX = math.ceil((320 - lcd.textWidth(prevDateStr)) / 2)  
-      else:
-        cleanupX = None  
-      printText(dateStr, x, y, prevDateStr, font=lcd.FONT_DejaVu24, backgroundColor=lcd.DARKGREY, textColor=textColor, cleanupX=cleanupX)  
-      prevDateStr = dateStr
+      #draw dateStr
+      if dateStr != prevDateStr:
+        lcd.font(lcd.FONT_DejaVu24)
+        textColor = lcd.WHITE
+        if isOlderThan(sgvDateStr, 10, now): 
+          textColor = lcd.RED
+        w = lcd.textWidth(dateStr)
+        x = math.ceil((320-w)/2)
+        y = 240-24-5
+        if prevDateStr != None: 
+          cleanupX = math.ceil((320 - lcd.textWidth(prevDateStr)) / 2)  
+        else:
+          cleanupX = None  
+        printText(dateStr, x, y, prevDateStr, font=lcd.FONT_DejaVu24, backgroundColor=lcd.DARKGREY, textColor=textColor, cleanupX=cleanupX)  
+        prevDateStr = dateStr
 
-  elif currentMode in range(4,7):
-    #flip mode
+    elif currentMode in range(4,7):
+      #flip mode
     
-    #draw sgv 
-    lcd.font(lcd.FONT_DejaVu72)
-    w = lcd.textWidth(sgvStr)
-    x = math.ceil(320 - (320 - w - 20 - 80) / 2)
-    if x > 275: x = 275 #fix to bug in micropyhton
-    y = 120 + 36
-    if sgvStr != prevSgvStr:
-      if prevSgvStr != None: 
-        cleanupX = math.ceil(320 - (320 - lcd.textWidth(prevSgvStr) - 20 - 80) / 2)  
-      else:
-        cleanupX = None  
-      printText(sgvStr, x, y, prevSgvStr, font=lcd.FONT_DejaVu72, backgroundColor=backgroundColor, rotate=180, cleanupX=cleanupX)
-      prevSgvStr = sgvStr
+      #draw sgv 
+      lcd.font(lcd.FONT_DejaVu72)
+      w = lcd.textWidth(sgvStr)
+      x = math.ceil(320 - (320 - w - 20 - 80) / 2)
+      if x > 275: x = 275 #fix to bug in micropyhton
+      y = 120 + 36
+      if sgvStr != prevSgvStr:
+        if prevSgvStr != None: 
+          cleanupX = math.ceil(320 - (320 - lcd.textWidth(prevSgvStr) - 20 - 80) / 2)  
+        else:
+          cleanupX = None  
+        printText(sgvStr, x, y, prevSgvStr, font=lcd.FONT_DejaVu72, backgroundColor=backgroundColor, rotate=180, cleanupX=cleanupX)
+        prevSgvStr = sgvStr
     
-    #draw arrow
-    x -= (60 + w)
-    y -= 30
+      #draw arrow
+      x -= (60 + w)
+      y -= 30
     
-    if directionStr == 'DoubleUp': printDoubleDirection(x, y, directionStr, ytop=-4, ybottom=12, rotateAngle=90, arrowColor=arrowColor, backgroundColor=backgroundColor)
-    elif directionStr == 'DoubleDown': printDoubleDirection(x, y, directionStr, ytop=-12, ybottom=4, rotateAngle=-90, arrowColor=arrowColor, backgroundColor=backgroundColor) 
-    elif directionStr == 'SingleUp': printDirection(x, y, directionStr, xshift=0, yshift=4, rotateAngle=90, arrowColor=arrowColor, backgroundColor=backgroundColor)
-    elif directionStr == 'SingleDown': printDirection(x, y, directionStr, xshift=0, yshift=-4, rotateAngle=-90, arrowColor=arrowColor, backgroundColor=backgroundColor)
-    elif directionStr == 'Flat': printDirection(x, y, directionStr, xshift=-4, rotateAngle=180, arrowColor=arrowColor, backgroundColor=backgroundColor)
-    elif directionStr == 'FortyFiveUp': printDirection(x, y, directionStr, xshift=-4, yshift=4, rotateAngle=135, arrowColor=arrowColor, backgroundColor=backgroundColor)
-    elif directionStr == 'FortyFiveDown': printDirection(x, y, directionStr, xshift=-4, yshift=-4, rotateAngle=-135, arrowColor=arrowColor, backgroundColor=backgroundColor)
+      if directionStr == 'DoubleUp': printDoubleDirection(x, y, directionStr, ytop=-4, ybottom=12, rotateAngle=90, arrowColor=arrowColor, backgroundColor=backgroundColor)
+      elif directionStr == 'DoubleDown': printDoubleDirection(x, y, directionStr, ytop=-12, ybottom=4, rotateAngle=-90, arrowColor=arrowColor, backgroundColor=backgroundColor) 
+      elif directionStr == 'SingleUp': printDirection(x, y, directionStr, xshift=0, yshift=4, rotateAngle=90, arrowColor=arrowColor, backgroundColor=backgroundColor)
+      elif directionStr == 'SingleDown': printDirection(x, y, directionStr, xshift=0, yshift=-4, rotateAngle=-90, arrowColor=arrowColor, backgroundColor=backgroundColor)
+      elif directionStr == 'Flat': printDirection(x, y, directionStr, xshift=-4, rotateAngle=180, arrowColor=arrowColor, backgroundColor=backgroundColor)
+      elif directionStr == 'FortyFiveUp': printDirection(x, y, directionStr, xshift=-4, yshift=4, rotateAngle=135, arrowColor=arrowColor, backgroundColor=backgroundColor)
+      elif directionStr == 'FortyFiveDown': printDirection(x, y, directionStr, xshift=-4, yshift=-4, rotateAngle=-135, arrowColor=arrowColor, backgroundColor=backgroundColor)
   
-    lcd.font(lcd.FONT_DejaVu18)
+      lcd.font(lcd.FONT_DejaVu18)
     
-    #draw current time
-    printLocaltimeInternal(localtime)
+      #draw current time
+      printLocaltime(localtime, clear=True)
 
-    #draw battery
-    if batteryStr != prevBatteryStr:
-      textColor = lcd.WHITE
-      if batteryLevel < 20 and backgroundColor != lcd.RED: textColor = lcd.RED
-      w = lcd.textWidth(batteryStr)
-      if prevBatteryStr != None: 
-        cleanupX = math.ceil(lcd.textWidth(prevBatteryStr)+5)
-      else:
-        cleanupX = None 
-      printText(batteryStr, math.ceil(w+5), 222, prevBatteryStr, font=lcd.FONT_DejaVu18, backgroundColor=lcd.DARKGREY, rotate=180, textColor=textColor, cleanupX=cleanupX) 
-      prevBatteryStr = batteryStr
+      #draw battery
+      if batteryStr != prevBatteryStr:
+        textColor = lcd.WHITE
+        if batteryLevel < 20 and backgroundColor != lcd.RED: textColor = lcd.RED
+        w = lcd.textWidth(batteryStr)
+        if prevBatteryStr != None: 
+          cleanupX = math.ceil(lcd.textWidth(prevBatteryStr)+5)
+        else:
+          cleanupX = None 
+        printText(batteryStr, math.ceil(w+5), 222, prevBatteryStr, font=lcd.FONT_DejaVu18, backgroundColor=lcd.DARKGREY, rotate=180, textColor=textColor, cleanupX=cleanupX) 
+        prevBatteryStr = batteryStr
 
-    #draw sgv diff
-    if prevSgvDiffStr != sgvDiffStr:
-      textColor = lcd.WHITE
-      if math.fabs(sgvDiff) >= 10 and backgroundColor != lcd.RED and not tooOld: textColor = lcd.RED
-      w = lcd.textWidth(sgvDiffStr)
-      if prevSgvDiffStr != None: 
-        wp = lcd.textWidth(prevSgvDiffStr)
-        cleanupX = math.ceil(wp+(320-wp)/2)
-      else:
-        cleanupX = None 
-      x = math.ceil(w+(320-w)/2)
-      printText(sgvDiffStr, x, 222, prevSgvDiffStr, font=lcd.FONT_DejaVu18, backgroundColor=lcd.DARKGREY, rotate=180, textColor=textColor, cleanupX=cleanupX)
-      prevSgvDiffStr = sgvDiffStr
+      #draw sgv diff
+      if prevSgvDiffStr != sgvDiffStr:
+        textColor = lcd.WHITE
+        if math.fabs(sgvDiff) >= 10 and backgroundColor != lcd.RED and not tooOld: textColor = lcd.RED
+        w = lcd.textWidth(sgvDiffStr)
+        if prevSgvDiffStr != None: 
+          wp = lcd.textWidth(prevSgvDiffStr)
+          cleanupX = math.ceil(wp+(320-wp)/2)
+        else:
+          cleanupX = None 
+        x = math.ceil(w+(320-w)/2)
+        printText(sgvDiffStr, x, 222, prevSgvDiffStr, font=lcd.FONT_DejaVu18, backgroundColor=lcd.DARKGREY, rotate=180, textColor=textColor, cleanupX=cleanupX)
+        prevSgvDiffStr = sgvDiffStr
     
-    #draw dateStr
-    if dateStr != prevDateStr:
-      lcd.font(lcd.FONT_DejaVu24)
-      textColor = lcd.WHITE
-      if isOlderThan(sgvDateStr, 10, now): textColor = lcd.RED
-      w = lcd.textWidth(dateStr)
-      x = math.ceil(320-(320-w)/2)
-      y = 24 + 5
-      if prevDateStr != None: 
-        cleanupX = math.ceil(320 - (320 - lcd.textWidth(prevDateStr)) / 2)  
-      else:
-        cleanupX = None  
-      printText(dateStr, x, y, prevDateStr, font=lcd.FONT_DejaVu24, backgroundColor=lcd.DARKGREY, rotate=180, textColor=textColor, cleanupX=cleanupX)  
-      prevDateStr = dateStr
-
-  print("Printing screen finished in " + str((utime.time() - s)) + " secs ...")
+      #draw dateStr
+      if dateStr != prevDateStr:
+        lcd.font(lcd.FONT_DejaVu24)
+        textColor = lcd.WHITE
+        if isOlderThan(sgvDateStr, 10, now): textColor = lcd.RED
+        w = lcd.textWidth(dateStr)
+        x = math.ceil(320-(320-w)/2)
+        y = 24 + 5
+        if prevDateStr != None: 
+          cleanupX = math.ceil(320 - (320 - lcd.textWidth(prevDateStr)) / 2)  
+        else:
+          cleanupX = None  
+        printText(dateStr, x, y, prevDateStr, font=lcd.FONT_DejaVu24, backgroundColor=lcd.DARKGREY, rotate=180, textColor=textColor, cleanupX=cleanupX)  
+        prevDateStr = dateStr
+    printScreenLock.release()
+    print("Printing screen finished in " + str((utime.time() - s)) + " secs ...")
+  else:    
+    print("Printing locked!")
 
 def backendMonitor():
   global response, INTERVAL, API_ENDPOINT, API_TOKEN, LOCALE, TIMEZONE, startTime, sgvDict, secondsDiff, backendResponseTimer
@@ -709,7 +711,7 @@ def watchdogCallback(t):
 
 def locatimeCallback(t):
   #print('Updating localtime ...')
-  printLocaltimeInternal()
+  printLocaltime()
 
 def onBtnPressed():
   global emergency, emergencyPause
