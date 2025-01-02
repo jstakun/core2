@@ -427,7 +427,7 @@ def printScreen(newestEntry, clear=False, noNetwork=False):
       lcd.font(lcd.FONT_DejaVu72)
       w = lcd.textWidth(sgvStr)
       x = math.ceil((320 - w - 20 - 80) / 2)
-      y = 120 - 36 #- 8
+      y = 120 - 36
       if sgvStr != prevSgvStr:
         if prevSgvStr != None: 
           cleanupX = math.ceil((320 - lcd.textWidth(prevSgvStr) - 20 - 80) / 2)
@@ -467,10 +467,10 @@ def printScreen(newestEntry, clear=False, noNetwork=False):
         if math.fabs(sgvDiff) >= 10 and backgroundColor != lcd.RED and not tooOld: textColor = lcd.RED
         w = lcd.textWidth(sgvDiffStr)
         if prevSgvDiffStr != None: 
-          cleanupX = math.ceil(20+(320-lcd.textWidth(prevSgvDiffStr))/2)
+          cleanupX = math.ceil(30 + (320 - lcd.textWidth(prevSgvDiffStr)) / 2)
         else:
           cleanupX = None 
-        x = math.ceil(20+(320-w)/2)
+        x = math.ceil(30 + (320 - w) / 2)
         printText(sgvDiffStr, x, 12, prevSgvDiffStr, font=lcd.FONT_DejaVu24, backgroundColor=lcd.DARKGREY, textColor=textColor, cleanupX=cleanupX)
         prevSgvDiffStr = sgvDiffStr
     
@@ -542,10 +542,10 @@ def printScreen(newestEntry, clear=False, noNetwork=False):
         w = lcd.textWidth(sgvDiffStr)
         if prevSgvDiffStr != None: 
           wp = lcd.textWidth(prevSgvDiffStr)
-          cleanupX = math.ceil(wp-20+(320-wp)/2)
+          cleanupX = math.ceil(wp - 30 + (320 - wp) / 2)
         else:
           cleanupX = None 
-        x = math.ceil(w-20+(320-w)/2)
+        x = math.ceil(w - 30 + (320 - w) / 2)
         printText(sgvDiffStr, x, 215, prevSgvDiffStr, font=lcd.FONT_DejaVu24, backgroundColor=lcd.DARKGREY, rotate=180, textColor=textColor, cleanupX=cleanupX)
         prevSgvDiffStr = sgvDiffStr
     
@@ -716,7 +716,7 @@ def watchdogCallback(t):
   machine.WDT(timeout=1000)   
 
 def locatimeCallback(t):
-  printLocaltime(silent=False)#True)
+  printLocaltime(silent=True)
 
 def onBtnPressed():
   global emergency, emergencyPause
