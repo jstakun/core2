@@ -455,10 +455,10 @@ def printScreen(newestEntry, clear=False, noNetwork=False):
         if batteryLevel < 20 and backgroundColor != lcd.RED: textColor = lcd.RED
         w = lcd.textWidth(batteryStr)
         if prevBatteryStr != None: 
-          cleanupX = math.ceil(320-5-lcd.textWidth(prevBatteryStr))
+          cleanupX = math.ceil(315 - lcd.textWidth(prevBatteryStr))
         else:
           cleanupX = None 
-        printText(batteryStr, math.ceil(320-5-w), 12, prevBatteryStr, font=lcd.FONT_DejaVu24, backgroundColor=lcd.DARKGREY, textColor=textColor, cleanupX=cleanupX) 
+        printText(batteryStr, math.ceil(315 - w), 12, prevBatteryStr, font=lcd.FONT_DejaVu24, backgroundColor=lcd.DARKGREY, textColor=textColor, cleanupX=cleanupX) 
         prevBatteryStr = batteryStr 
 
       #draw sgv diff
@@ -481,7 +481,7 @@ def printScreen(newestEntry, clear=False, noNetwork=False):
         if isOlderThan(sgvDateStr, 10, now): 
           textColor = lcd.RED
         w = lcd.textWidth(dateStr)
-        x = math.ceil((320-w)/2)
+        x = math.ceil((320 - w) / 2)
         y = 240-24-5
         if prevDateStr != None: 
           cleanupX = math.ceil((320 - lcd.textWidth(prevDateStr)) / 2)  
@@ -555,7 +555,7 @@ def printScreen(newestEntry, clear=False, noNetwork=False):
         textColor = lcd.WHITE
         if isOlderThan(sgvDateStr, 10, now): textColor = lcd.RED
         w = lcd.textWidth(dateStr)
-        x = math.ceil(320-(320-w)/2)
+        x = math.ceil(320 - (320 - w) / 2)
         y = 24 + 5
         if prevDateStr != None: 
           cleanupX = math.ceil(320 - (320 - lcd.textWidth(prevDateStr)) / 2)  
@@ -571,6 +571,7 @@ def printScreen(newestEntry, clear=False, noNetwork=False):
 def backendMonitor():
   global response, INTERVAL, API_ENDPOINT, API_TOKEN, LOCALE, TIMEZONE, startTime, sgvDict, secondsDiff, backendResponseTimer
   lastid = -1
+  resp = None
   while True:
     try:
       print('Battery level: ' + str(getBatteryLevel()) + '%')
@@ -580,8 +581,10 @@ def backendMonitor():
       print('Calling backend ...')
       s = utime.time()
       backendResponseTimer.init(mode=machine.Timer.ONE_SHOT, period=BACKEND_TIMEOUT_MS+10000, callback=watchdogCallback)
-      response = urequests.get(API_ENDPOINT + "/entries.json?count=10&waitfornextid=" + str(lastid) + "&timeout=" + str(BACKEND_TIMEOUT_MS), headers={'api-secret': API_TOKEN,'accept-language': LOCALE,'accept-charset': 'ascii', 'x-gms-tz': TIMEZONE}).json()
+      resp = urequests.get(API_ENDPOINT + "/entries.json?count=10&waitfornextid=" + str(lastid) + "&timeout=" + str(BACKEND_TIMEOUT_MS), headers={'api-secret': API_TOKEN,'accept-language': LOCALE,'accept-charset': 'ascii', 'x-gms-tz': TIMEZONE})
       backendResponseTimer.deinit()
+      response = resp.json()
+      resp.close()
       printTime((utime.time() - s), prefix='Response received in')
       sgv = response[0]['sgv']
       sgvDate = response[0]['date']
@@ -597,6 +600,7 @@ def backendMonitor():
       #persistEntries() 
     except Exception as e:
       backendResponseTimer.deinit()
+      if resp != None: resp.close()
       sys.print_exception(e)
       print('Battery level: ' + str(getBatteryLevel()) + '%')
       if response == None: readResponseFile()
@@ -686,6 +690,7 @@ def emergencyMonitor():
       #print('No emergency status')
       time.sleep(2)
 
+#accelerator
 def mpuMonitor():
   while True:
     mpuAction()
@@ -712,7 +717,7 @@ def touchPadCallback(t):
     onBtnPressed()
 
 def watchdogCallback(t):
-  print('Restarting device ...')
+  print('Restarting device from watchdogCallback ...')
   machine.WDT(timeout=1000)   
 
 def locatimeCallback(t):
