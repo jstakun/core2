@@ -27,6 +27,7 @@ BACKEND_TIMEOUT_MS = 60000
 MAX_SAVED_ENTRIES = 10
 
 printScreenLock = _thread.allocate_lock()
+backendResponse = None
 
 def getBatteryLevel():
   volt = power.getBatVoltage()
@@ -571,7 +572,6 @@ def printScreen(newestEntry, clear=False, noNetwork=False):
 def backendMonitor():
   global response, INTERVAL, API_ENDPOINT, API_TOKEN, LOCALE, TIMEZONE, startTime, sgvDict, secondsDiff, backendResponseTimer
   lastid = -1
-  resp = None
   while True:
     try:
       print('Battery level: ' + str(getBatteryLevel()) + '%')
@@ -581,10 +581,10 @@ def backendMonitor():
       print('Calling backend ...')
       s = utime.time()
       backendResponseTimer.init(mode=machine.Timer.ONE_SHOT, period=BACKEND_TIMEOUT_MS+10000, callback=watchdogCallback)
-      resp = urequests.get(API_ENDPOINT + "/entries.json?count=10&waitfornextid=" + str(lastid) + "&timeout=" + str(BACKEND_TIMEOUT_MS), headers={'api-secret': API_TOKEN,'accept-language': LOCALE,'accept-charset': 'ascii', 'x-gms-tz': TIMEZONE})
+      backendResponse = urequests.get(API_ENDPOINT + "/entries.json?count=10&waitfornextid=" + str(lastid) + "&timeout=" + str(BACKEND_TIMEOUT_MS), headers={'api-secret': API_TOKEN,'accept-language': LOCALE,'accept-charset': 'ascii', 'x-gms-tz': TIMEZONE})
       backendResponseTimer.deinit()
-      response = resp.json()
-      resp.close()
+      response = backendResponse.json()
+      backendResponse.close()
       printTime((utime.time() - s), prefix='Response received in')
       sgv = response[0]['sgv']
       sgvDate = response[0]['date']
@@ -600,7 +600,7 @@ def backendMonitor():
       #persistEntries() 
     except Exception as e:
       backendResponseTimer.deinit()
-      if resp != None: resp.close()
+      if backendResponse != None: backendResponse.close()
       sys.print_exception(e)
       print('Battery level: ' + str(getBatteryLevel()) + '%')
       if response == None: readResponseFile()
@@ -717,11 +717,16 @@ def touchPadCallback(t):
     onBtnPressed()
 
 def watchdogCallback(t):
-  print('Restarting device from watchdogCallback ...')
+  print('Restarting due to backed communication failure ...')
+  if backendResponse != None: 
+     backendResponse.close()
+     backendResponse = None
   machine.WDT(timeout=1000)   
+  printCenteredText("Restarting...", backgroundColor=lcd.RED, clear=True)
 
 def locatimeCallback(t):
-  printLocaltime(silent=True)
+  if backendResponse != None:
+    printLocaltime(silent=True)
 
 def onBtnPressed():
   global emergency, emergencyPause
@@ -866,7 +871,7 @@ except Exception as e:
   time.sleep(2)
   machine.WDT(timeout=1000)
   printCenteredText("Restarting...", backgroundColor=lcd.RED, clear=True)
-  print('Restarting device ...')    
+  print('Restarting device due to time server connection failure...')    
   time.sleep(60) #wait until watchdog restarts device  
 
 printCenteredText("Loading data...", backgroundColor=lcd.DARKGREY) #lcd.DARKGREEN)
