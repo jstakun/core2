@@ -570,7 +570,7 @@ def printScreen(newestEntry, clear=False, noNetwork=False):
     print("Printing locked!")
 
 def backendMonitor():
-  global response, INTERVAL, API_ENDPOINT, API_TOKEN, LOCALE, TIMEZONE, startTime, sgvDict, secondsDiff, backendResponseTimer
+  global response, API_ENDPOINT, API_TOKEN, LOCALE, TIMEZONE, startTime, sgvDict, secondsDiff, backendResponseTimer
   lastid = -1
   while True:
     try:
@@ -717,7 +717,7 @@ def touchPadCallback(t):
     onBtnPressed()
 
 def watchdogCallback(t):
-  print('Restarting due to backed communication failure ...')
+  print('Restarting due to backend communication failure ...')
   if backendResponse != None: 
      backendResponse.close()
      backendResponse = None
@@ -784,7 +784,6 @@ try:
   API_ENDPOINT = config["api-endpoint"]
   API_TOKEN = config["api-token"]
   LOCALE = config["locale"]
-  INTERVAL = config["interval"]
   MIN = config["min"]
   MAX = config["max"]
   EMERGENCY_MIN = config["emergencyMin"]
@@ -796,7 +795,6 @@ try:
   OLD_DATA = config["oldData"]
   OLD_DATA_EMERGENCY = config["oldDataEmergency"]
 
-  if INTERVAL<30: INTERVAL=30
   if MIN<30: MIN=30
   if MAX<100: MAX=100
   if EMERGENCY_MIN<30 or MIN<=EMERGENCY_MIN: EMERGENCY_MIN=MIN-10
