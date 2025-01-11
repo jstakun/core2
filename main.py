@@ -718,15 +718,12 @@ def touchPadCallback(t):
 
 def watchdogCallback(t):
   print('Restarting due to backend communication failure ...')
-  if backendResponse != None: 
-     backendResponse.close()
-     backendResponse = None
+  if backendResponse != None: backendResponse.close()
   machine.WDT(timeout=1000)   
   printCenteredText("Restarting...", backgroundColor=lcd.RED, clear=True)
 
 def locatimeCallback(t):
-  if backendResponse != None:
-    printLocaltime(silent=True)
+  printLocaltime(silent=True)
 
 def onBtnPressed():
   global emergency, emergencyPause
@@ -748,6 +745,8 @@ screen = M5Screen()
 screen.set_screen_brightness(brightness)
 
 lcd.clear(lcd.DARKGREY)
+rgbUnit = unit.get(unit.RGB, unit.PORTA)
+rgbUnit.setColor(2, lcd.DARKGREY)
 
 print('Starting ...')
 print('APIKEY:',deviceCfg.get_apikey())
@@ -762,7 +761,10 @@ print('Machine unique id:', machine_id.decode())
 response = None
 emergency = False
 emergencyPause = 0
+
 mode = 0
+mpu = IMU()
+if mpu.acceleration[1] < 0: mode = 4 #flip
   
 headerColor = None
 middleColor = None
@@ -795,12 +797,12 @@ try:
   OLD_DATA = config["oldData"]
   OLD_DATA_EMERGENCY = config["oldDataEmergency"]
 
-  if MIN<30: MIN=30
-  if MAX<100: MAX=100
-  if EMERGENCY_MIN<30 or MIN<=EMERGENCY_MIN: EMERGENCY_MIN=MIN-10
-  if EMERGENCY_MAX<100 or MAX>=EMERGENCY_MAX: EMERGENCY_MAX=MAX+10  
-  if len(API_ENDPOINT)==0: raise Exception("Empty api-endpoint parameter")
-  if len(WIFI)==0: raise Exception("Empty wifi parameter") 
+  if MIN < 30: MIN=30
+  if MAX < 100: MAX=100
+  if EMERGENCY_MIN < 30 or MIN<=EMERGENCY_MIN: EMERGENCY_MIN=MIN-10
+  if EMERGENCY_MAX < 100 or MAX>=EMERGENCY_MAX: EMERGENCY_MAX=MAX+10  
+  if len(API_ENDPOINT) == 0: raise Exception("Empty api-endpoint parameter")
+  if len(WIFI) == 0: raise Exception("Empty wifi parameter") 
   if USE_BEEPER != 1 and USE_BEEPER != 0: USE_BEEPER=1
   if re.search("^GMT[+-]((0?[0-9]|1[0-1]):([0-5][0-9])|12:00)$",TIMEZONE)==None: TIMEZONE="GMT+0:00"
   if OLD_DATA < 10: OLD_DATA=10
@@ -811,21 +813,16 @@ try:
   secondsDiff = HH * 3600 + MM * 60
   if TIMEZONE[3] == "-": secondsDiff = secondsDiff * -1
   print('Local time seconds diff from UTC:', secondsDiff) 
-
-  mpu = IMU()
-  if mpu.acceleration[1] < 0: mode = 4 #flip
-
-  rgbUnit = unit.get(unit.RGB, unit.PORTA)
-  rgbUnit.setColor(2, lcd.DARKGREY)
-
-  lcd.clear(lcd.DARKGREY)
 except Exception as e:
   sys.print_exception(e)
+  #TODO if config.json is absent start wifi access point and expose web server on port 80 with config web ui
   while True:
     printCenteredText("Fix config.json!", backgroundColor=lcd.RED, clear=True)
     time.sleep(2)
     printCenteredText("Restart required!", backgroundColor=lcd.RED, clear=True)
     time.sleep(2)  
+
+# from here code runs only if application is properly configured
 
 nic = network.WLAN(network.STA_IF)
 nic.active(True)
