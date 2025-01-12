@@ -2,6 +2,4 @@ screenlog.*
 m5stack.txt
 lv.py
 hangman.py
-ap.py
 copyConfigJson.sh
-*.html

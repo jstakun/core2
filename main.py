@@ -18,6 +18,8 @@ from collections import OrderedDict
 from imu import IMU
 import re
 import json
+import nvs
+import ap
 
 EMERGENCY_PAUSE_INTERVAL = 1800  #sec = 30 mins
 MODES = ["full_elapsed", "full_date", "full_battery", "basic", "flip_full_elapsed", "flip_full_date", "flip_full_battery", "chart", "flip_chart"]
@@ -714,7 +716,10 @@ def touchPadCallback(t):
     tx = t[0]
     ty = t[1]
     print("Touch screen pressed at " + str(tx) + "," + str(ty))
-    onBtnPressed()
+    if tx >= 120 and tx <= 160 and ty >= 240 and ty <= 280:
+      onBtnBPressed()
+    else:
+      onBtnPressed()
 
 def watchdogCallback(t):
   print('Restarting due to backend communication failure ...')
@@ -726,6 +731,7 @@ def locatimeCallback(t):
   printLocaltime(silent=True)
 
 def onBtnPressed():
+  print('Button pressed')
   global emergency, emergencyPause
   if emergency == True:
     emergency = False
@@ -737,6 +743,12 @@ def onBtnPressed():
     screen = M5Screen()
     screen.set_screen_brightness(brightness)
     saveConfig('brightness', brightness)
+
+def onBtnBPressed():
+  print('Button B pressed')
+  nvs.write(ap.CONFIG, 0)
+  machine.WDT(timeout=1000)
+  printCenteredText("Restarting...", backgroundColor=lcd.RED, clear=True)  
 
 # ------------------------------------------------------------------------------     
 
@@ -778,50 +790,58 @@ prevBatteryStr = None
 prevTimeStr = None 
 prevSgvStr = None
 
-try: 
-  confFile = open('config.json', 'r')
-  config = ujson.loads(confFile.read())
+config = nvs.read_int(ap.CONFIG)
+if config == None or config == 0:
+   printCenteredText("Connect AP ...", backgroundColor=lcd.RED, clear=True)
+   print("Connect wifi " + ap.SSID)
+   def reboot():
+      print('Restarting after configuration change...')
+      machine.WDT(timeout=1000)   
+      printCenteredText("Restarting...", backgroundColor=lcd.RED, clear=True)   
+   ap.open_access_point(reboot)  
+else:
+   try: 
+     SSID = nvs.read_str('ssid')
+     WIFI_PASSWORD = nvs.read_str('wifi_password')
+     API_ENDPOINT = nvs.read_str("api-endpoint")
+     API_TOKEN = nvs.read_str("api-token")
+     LOCALE = nvs.read_str("locale")
+     MIN = nvs.read_int("min")
+     MAX = nvs.read_int("max")
+     EMERGENCY_MIN = nvs.read_int("emergencyMin")
+     EMERGENCY_MAX = nvs.read_int("emergencyMax") 
+     TIMEZONE = "GMT" + nvs.read_str("timezone")
+     USE_BEEPER = nvs.read_int("beeper")
+     BEEPER_START_TIME = nvs.read_str("beeperStartTime")
+     BEEPER_END_TIME = nvs.read_str("beeperEndTime")
+     OLD_DATA = nvs.read_int("oldData")
+     OLD_DATA_EMERGENCY = nvs.read_int("oldDataEmergenc")
 
-  WIFI = config["wifi"]
-  API_ENDPOINT = config["api-endpoint"]
-  API_TOKEN = config["api-token"]
-  LOCALE = config["locale"]
-  MIN = config["min"]
-  MAX = config["max"]
-  EMERGENCY_MIN = config["emergencyMin"]
-  EMERGENCY_MAX = config["emergencyMax"] 
-  TIMEZONE = config["timezone"]
-  USE_BEEPER = config["beeper"]
-  BEEPER_START_TIME = config["beeperStartTime"]
-  BEEPER_END_TIME = config["beeperEndTime"]
-  OLD_DATA = config["oldData"]
-  OLD_DATA_EMERGENCY = config["oldDataEmergency"]
+     if MIN < 30: MIN=30
+     if MAX < 100: MAX=100
+     if EMERGENCY_MIN < 30 or MIN <= EMERGENCY_MIN: EMERGENCY_MIN=MIN-10
+     if EMERGENCY_MAX < 100 or MAX >= EMERGENCY_MAX: EMERGENCY_MAX=MAX+10  
+     if len(API_ENDPOINT) == 0: raise Exception("Empty api-endpoint parameter")
+     if len(SSID) == 0: raise Exception("Empty ssid parameter") 
+     if len(WIFI_PASSWORD) == 0: raise Exception("Empty wifi password parameter") 
+     if USE_BEEPER != 1 and USE_BEEPER != 0: USE_BEEPER=1
+     if re.search("^GMT[+-]((0?[0-9]|1[0-1]):([0-5][0-9])|12:00)$",TIMEZONE) == None: TIMEZONE="GMT+0:00"
+     if OLD_DATA < 10: OLD_DATA=10
+     if OLD_DATA_EMERGENCY < 15: OLD_DATA_EMERGENCY=15
 
-  if MIN < 30: MIN=30
-  if MAX < 100: MAX=100
-  if EMERGENCY_MIN < 30 or MIN<=EMERGENCY_MIN: EMERGENCY_MIN=MIN-10
-  if EMERGENCY_MAX < 100 or MAX>=EMERGENCY_MAX: EMERGENCY_MAX=MAX+10  
-  if len(API_ENDPOINT) == 0: raise Exception("Empty api-endpoint parameter")
-  if len(WIFI) == 0: raise Exception("Empty wifi parameter") 
-  if USE_BEEPER != 1 and USE_BEEPER != 0: USE_BEEPER=1
-  if re.search("^GMT[+-]((0?[0-9]|1[0-1]):([0-5][0-9])|12:00)$",TIMEZONE)==None: TIMEZONE="GMT+0:00"
-  if OLD_DATA < 10: OLD_DATA=10
-  if OLD_DATA_EMERGENCY < 15: OLD_DATA_EMERGENCY=15
-
-  timeStr = TIMEZONE[4:]
-  [HH, MM] = [int(i) for i in timeStr.split(':')]
-  secondsDiff = HH * 3600 + MM * 60
-  if TIMEZONE[3] == "-": secondsDiff = secondsDiff * -1
-  print('Local time seconds diff from UTC:', secondsDiff) 
-except Exception as e:
-  sys.print_exception(e)
-  #TODO if config.json is absent start wifi access point and expose web server on port 80 with config web ui
-  while True:
-    printCenteredText("Fix config.json!", backgroundColor=lcd.RED, clear=True)
-    time.sleep(2)
-    printCenteredText("Restart required!", backgroundColor=lcd.RED, clear=True)
-    time.sleep(2)  
-
+     timeStr = TIMEZONE[4:]
+     [HH, MM] = [int(i) for i in timeStr.split(':')]
+     secondsDiff = HH * 3600 + MM * 60
+     if TIMEZONE[3] == "-": secondsDiff = secondsDiff * -1
+     print('Local time seconds diff from UTC:', secondsDiff) 
+   except Exception as e:
+     sys.print_exception(e)
+     nvs.write(ap.CONFIG, 0)
+     printCenteredText("Fix config!", backgroundColor=lcd.RED, clear=True)
+     time.sleep(2)
+     machine.WDT(timeout=1000)
+     printCenteredText("Restarting...", backgroundColor=lcd.RED, clear=True)
+  
 # from here code runs only if application is properly configured
 
 nic = network.WLAN(network.STA_IF)
@@ -835,7 +855,7 @@ while not found:
     nets = nic.scan()
     for result in nets:
       ssid = result[0].decode() 
-      if ssid in WIFI: found = True; SSID=ssid; WIFI_PASSWORD=WIFI[ssid]; break
+      if ssid == SSID: found = True; break
   except Exception as e:
       sys.print_exception(e)
       printCenteredText("Wifi not found!", backgroundColor=lcd.RED, clear=True)  
@@ -876,7 +896,7 @@ dictLen = len(sgvDict)
 print("Loaded " + str(dictLen) + " sgv entries")
 
 btnA.wasPressed(onBtnPressed)
-btnB.wasPressed(onBtnPressed)
+btnB.wasPressed(onBtnBPressed)
 btnC.wasPressed(onBtnPressed)
 
 #max 4 timers 0-3
