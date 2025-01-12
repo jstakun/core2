@@ -1,8 +1,10 @@
 # Glucose level monitor for M5Stack Core2 device
 
-With this application you can visualize glucose level readings stored in Nightscout cloud database on M5Stack M5StickC Plus devices.
+With this application you can visualize on M5Stack Core2 devices glucose level readings stored in Nightscout API cloud database.
 
-In order to run this application you must create config.json configuration file based on [config.json.sample](config.json.sample) and upload it together with [main.py](main.py) to the M5Stack M5StickC Plus device.
+In order to run this application you must first copy [main.py](main.py), [ap.py](app.py), config.html and success.html to the M5Stack Core2 device.
+
+When you boot the device for the first time it will open wifi named AP-M5DiabConf. Connect to it and open in web browser url http://192.168.4.1. Enter all mandatory configuration parameters: ssid, wifi_password, api_endpoint, api_token. When you are done click on "Save Configuration' button at the bottom and wait until M5Stack Core2 device reboots, connects to your wifi and starts downloading glucose level readings from Nightscout API endpoint.
 
 This application has been tested with xDrip+ application installed od Android mobile phone as source of glucose level readings from CGM system.
 
