@@ -29,7 +29,6 @@ BACKEND_TIMEOUT_MS = 60000
 MAX_SAVED_ENTRIES = 10
 
 printScreenLock = _thread.allocate_lock()
-backendResponse = None
 
 def getBatteryLevel():
   volt = power.getBatVoltage()
@@ -572,7 +571,7 @@ def printScreen(newestEntry, clear=False, noNetwork=False):
     print("Printing locked!")
 
 def backendMonitor():
-  global response, API_ENDPOINT, API_TOKEN, LOCALE, TIMEZONE, startTime, sgvDict, secondsDiff, backendResponseTimer
+  global response, API_ENDPOINT, API_TOKEN, LOCALE, TIMEZONE, startTime, sgvDict, secondsDiff, backendResponseTimer, backendResponse
   lastid = -1
   while True:
     try:
@@ -722,13 +721,17 @@ def touchPadCallback(t):
       onBtnPressed()
 
 def watchdogCallback(t):
+  global shuttingDown, backendResponse 
   print('Restarting due to backend communication failure ...')
   if backendResponse != None: backendResponse.close()
   machine.WDT(timeout=1000)   
+  shuttingDown = True
   printCenteredText("Restarting...", backgroundColor=lcd.RED, clear=True)
 
 def locatimeCallback(t):
-  printLocaltime(silent=True)
+  global shuttingDown 
+  if shuttingDown == False:
+    printLocaltime(silent=True)
 
 def onBtnPressed():
   print('Button pressed')
@@ -745,9 +748,11 @@ def onBtnPressed():
     saveConfig('brightness', brightness)
 
 def onBtnBPressed():
+  global shuttingDown
   print('Button B pressed')
   nvs.write(ap.CONFIG, 0)
   machine.WDT(timeout=1000)
+  shuttingDown = True
   printCenteredText("Restarting...", backgroundColor=lcd.RED, clear=True)  
 
 # ------------------------------------------------------------------------------     
@@ -773,6 +778,8 @@ print('Machine unique id:', machine_id.decode())
 response = None
 emergency = False
 emergencyPause = 0
+shuttingDown = False
+backendResponse = None
 
 mode = 0
 mpu = IMU()
@@ -795,8 +802,10 @@ if config == None or config == 0:
    printCenteredText("Connect AP ...", backgroundColor=lcd.RED, clear=True)
    print("Connect wifi " + ap.SSID)
    def reboot():
+      global shuttingDown 
       print('Restarting after configuration change...')
       machine.WDT(timeout=1000)   
+      shuttingDown = True
       printCenteredText("Restarting...", backgroundColor=lcd.RED, clear=True)   
    ap.open_access_point(reboot)  
 else:
@@ -840,6 +849,7 @@ else:
      printCenteredText("Fix config!", backgroundColor=lcd.RED, clear=True)
      time.sleep(2)
      machine.WDT(timeout=1000)
+     shuttingDown = True
      printCenteredText("Restarting...", backgroundColor=lcd.RED, clear=True)
   
 # from here code runs only if application is properly configured
@@ -881,10 +891,10 @@ try:
     startTime = utime.time()
 except Exception as e:
   sys.print_exception(e)
-  #while True:
   printCenteredText("Failed to set time!", backgroundColor=lcd.RED, clear=True)
   time.sleep(2)
   machine.WDT(timeout=1000)
+  shuttingDown = True
   printCenteredText("Restarting...", backgroundColor=lcd.RED, clear=True)
   print('Restarting device due to time server connection failure...')    
   time.sleep(60) #wait until watchdog restarts device  
