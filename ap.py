@@ -6,6 +6,7 @@ import network
 import esp
 esp.osdebug(None)
 import nvs
+import uos
 
 SSID = 'AP-M5DiabConf'
 PASSWORD = '123456789'
@@ -13,11 +14,15 @@ CONFIG = 'config'
 
 ipconfig = None
 
+def randstr(length=20):
+    source = 'abcdefghijklmnopqrstuvwxyz1234567890'
+    return ''.join([source[x] for x in [(uos.urandom(1)[0] % len(source)) for _ in range(length)]])
+
 def readHtmlFile(filename):
-   htmlFile = open(filename, 'r')
-   html = htmlFile.read()
-   htmlFile.close()
-   return html
+    htmlFile = open(filename, 'r')
+    html = htmlFile.read()
+    htmlFile.close()
+    return html
 
 def unquote(string):
     if not string:
@@ -48,7 +53,8 @@ def open_access_point(successCallback):
 
   ap = network.WLAN(network.AP_IF)
   ap.active(True)
-  ap.config(essid=SSID, password=PASSWORD)
+  ssid = SSID + "-" + randstr(5)
+  ap.config(essid=ssid, password=PASSWORD)
   ap.config(max_clients=1) 
 
   while ap.active() == False:
@@ -88,7 +94,8 @@ def open_access_point(successCallback):
       entries = configParams.split('&') 
       for entry in entries:
         [k,v] = entry.split('=')
-        #max k length 15
+        #max nvs key length = 15
+        if len(k) > 15: k = k[0:15]
         value = unquote(v).decode()
         if value.isdigit(): value = int(value) 
         nvs.write(k, value)

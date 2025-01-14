@@ -4,7 +4,6 @@ from uiflow import *
 import math
 import os
 import time
-import ujson
 import network
 import sys
 import deviceCfg
