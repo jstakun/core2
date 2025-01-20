@@ -26,6 +26,7 @@ SGVDICT_FILE = 'sgvdict.txt'
 RESPONSE_FILE = 'response.txt'
 BACKEND_TIMEOUT_MS = 60000
 MAX_SAVED_ENTRIES = 10
+YEAR = 2025
 
 printScreenLock = _thread.allocate_lock()
 
@@ -93,16 +94,19 @@ def readConfig(name, defaultValue):
  
 def saveResponseFile():
   global response
-  responseFile = open(RESPONSE_FILE, 'w')
-  responseFile.write(str(response).replace('\'','\"'))
-  responseFile.close()  
+  content = str(response).replace('\'','\"')
+  nvs.write(RESPONSE_FILE, content)
+  #responseFile = open(RESPONSE_FILE, 'w')
+  #responseFile.write(content)
+  #responseFile.close()  
 
 def readResponseFile():
   global response
   try:
-    responseFile = open(RESPONSE_FILE, 'r')
-    response = json.load(responseFile)
-    responseFile.close()
+    #responseFile = open(RESPONSE_FILE, 'r')
+    #response = json.load(responseFile)
+    #responseFile.close()
+    response = json.loads(nvs.read_str(RESPONSE_FILE))
   except Exception as e:
     sys.print_exception(e)
     response = None
@@ -110,21 +114,24 @@ def readResponseFile():
 def saveSgvFile(sgvdict):
   items = []
   for key in sgvdict:
-     items.append(str(key) + ':' + str(sgvdict[key]))
-  sgvfile = open(SGVDICT_FILE, 'w')
-  sgvfile.write('\n'.join(items))
-  sgvfile.close()  
+    items.append(str(key) + ':' + str(sgvdict[key]))
+  content = '\n'.join(items)
+  nvs.write(SGVDICT_FILE, content)
+  #sgvfile = open(SGVDICT_FILE, 'w')
+  #sgvfile.write(content)
+  #sgvfile.close()  
 
 def readSgvFile():
   d = OrderedDict()
   try: 
-    sgvfile = open(SGVDICT_FILE, 'r')
-    entries = sgvfile.read().split('\n')
+    #sgvfile = open(SGVDICT_FILE, 'r')
+    #entries = sgvfile.read().split('\n')
+    #sgvfile.close()
+    entries = nvs.read_str(SGVDICT_FILE).split('\n')
     for entry in entries:
       if ":" in entry:
         [s, v] = [int(i) for i in entry.split(':')]
-        d.update({s: v})
-    sgvfile.close()    
+        d.update({s: v})   
   except Exception as e:
     sys.print_exception(e)
   return d 
@@ -158,6 +165,8 @@ def checkBeeper():
     if USE_BEEPER == 1:
       d = utime.localtime(0)
       now_datetime = rtc.datetime() 
+      if now_datetime[0] < YEAR:
+        raise ValueError('Invalid datetime: ' + str(now_datetime))
       now = utime.mktime((now_datetime[0], now_datetime[1], now_datetime[2], now_datetime[4], now_datetime[5], now_datetime[6],0,0))
       localtime = utime.localtime(now + secondsDiff)
       
@@ -284,6 +293,8 @@ def printLocaltime(localtime=None, useLock=False, silent=False):
   global prevTimeStr, mode, secondsDiff
   if localtime == None:
     now_datetime = rtc.datetime()
+    if now_datetime[0] < YEAR:
+      raise ValueError('Invalid datetime: ' + str(now_datetime))
     now = utime.mktime((now_datetime[0], now_datetime[1], now_datetime[2], now_datetime[4], now_datetime[5], now_datetime[6],0,0))  + secondsDiff
     localtime = utime.localtime(now)
   h = str(localtime[3])
@@ -326,6 +337,8 @@ def printScreen(newestEntry, clear=False, noNetwork=False):
   sgvDateStr = newestEntry['date']
   
   now_datetime = rtc.datetime()
+  if now_datetime[0] < YEAR:
+    raise ValueError('Invalid datetime: ' + str(now_datetime))
   now = utime.mktime((now_datetime[0], now_datetime[1], now_datetime[2], now_datetime[4], now_datetime[5], now_datetime[6],0,0))  + secondsDiff
   #localtime = utime.localtime(now)
   
@@ -883,7 +896,7 @@ printCenteredText("Setting time...", backgroundColor=lcd.DARKGREY) #lcd.GREENYEL
 try: 
   rtc.settime('ntp', host='pool.ntp.org', tzone=1) #UTC 
   now_datetime = rtc.datetime() 
-  if now_datetime[0] < 2024: 
+  if now_datetime[0] < YEAR: 
     raise ValueError('Invalid datetime: ' + str(now_datetime))
   else:                                              
     print("Current UTC datetime " +  str(now_datetime))
