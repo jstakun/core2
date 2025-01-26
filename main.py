@@ -291,35 +291,34 @@ def drawTriangle(centerX, centerY, arrowColor, rotateAngle=90, width=44, height=
 
 def printLocaltime(localtime=None, useLock=False, silent=False):
   global prevTimeStr, mode, secondsDiff
-  if localtime == None:
-    now_datetime = rtc.datetime()
-    if now_datetime[0] < YEAR:
-      raise ValueError('Invalid datetime: ' + str(now_datetime))
-    now = utime.mktime((now_datetime[0], now_datetime[1], now_datetime[2], now_datetime[4], now_datetime[5], now_datetime[6],0,0))  + secondsDiff
-    localtime = utime.localtime(now)
-  h = str(localtime[3])
-  if (localtime[3] < 10): h = "0" + h   
-  m = str(localtime[4])
-  if (localtime[4] < 10): m = "0" + m
-  s = str(localtime[5])
-  if (localtime[5] < 10): s = "0" + s
-  timeStr = h + ":" + m + ":" + s
-  if timeStr != prevTimeStr:
-    locked = False 
-    if useLock == False and printScreenLock.locked() == False:
-      locked = printScreenLock.acquire()
-    if locked == True or useLock == True:
-      if mode in range (0,3):
-        printText(timeStr, 10, 12, prevTimeStr, font=lcd.FONT_DejaVu24, backgroundColor=lcd.DARKGREY, silent=silent)  
-      elif mode in range (4,7):
-        printText(timeStr, 304, 215, prevTimeStr, font=lcd.FONT_DejaVu24, backgroundColor=lcd.DARKGREY, rotate=180, silent=silent)  
-      prevTimeStr = timeStr 
-      if useLock == False and locked == True:
-        printScreenLock.release()
-  #  else:
-  #    print("Printing localtime locked=" + str(locked) + ", useLock=" + str(useLock))    
-  #else:
-  #  print("Skipped printing localtime")    
+  try: 
+    if localtime == None:
+      now_datetime = rtc.datetime()
+      if now_datetime[0] < YEAR:
+        raise ValueError('Invalid datetime: ' + str(now_datetime))
+      now = utime.mktime((now_datetime[0], now_datetime[1], now_datetime[2], now_datetime[4], now_datetime[5], now_datetime[6],0,0))  + secondsDiff
+      localtime = utime.localtime(now)
+    h = str(localtime[3])
+    if (localtime[3] < 10): h = "0" + h   
+    m = str(localtime[4])
+    if (localtime[4] < 10): m = "0" + m
+    s = str(localtime[5])
+    if (localtime[5] < 10): s = "0" + s
+    timeStr = h + ":" + m + ":" + s
+    if timeStr != prevTimeStr:
+      locked = False 
+      if useLock == False and printScreenLock.locked() == False:
+        locked = printScreenLock.acquire()
+      if locked == True or useLock == True:
+        if mode in range (0,3):
+          printText(timeStr, 10, 12, prevTimeStr, font=lcd.FONT_DejaVu24, backgroundColor=lcd.DARKGREY, silent=silent)  
+        elif mode in range (4,7):
+          printText(timeStr, 304, 215, prevTimeStr, font=lcd.FONT_DejaVu24, backgroundColor=lcd.DARKGREY, rotate=180, silent=silent)  
+        prevTimeStr = timeStr 
+        if useLock == False and locked == True:
+          printScreenLock.release()
+  except Exception as e:
+    sys.print_exception(e)
 
 def printScreen(newestEntry, clear=False, noNetwork=False):
   global response, mode, brightness, emergency, emergencyPause, MIN, MAX, EMERGENCY_MIN, EMERGENCY_MAX, startTime, rgbUnit, secondsDiff, OLD_DATA, OLD_DATA_EMERGENCY, headerColor, middleColor, footerColor, prevDateStr, prevSgvDiffStr, prevBatteryStr, prevTimeStr, prevSgvStr, prevX, prevY, prevDirectionStr 
@@ -614,6 +613,7 @@ def backendMonitor():
     except Exception as e:
       backendResponseTimer.deinit()
       if backendResponse != None: backendResponse.close()
+      lastid = -1
       sys.print_exception(e)
       print('Battery level: ' + str(getBatteryLevel()) + '%')
       if response == None: readResponseFile()
