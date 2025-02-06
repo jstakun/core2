@@ -624,8 +624,8 @@ def backendMonitor():
           printCenteredText("Network error! Please wait.", backgroundColor=lcd.RED, clear=True)
       except Exception as e:
         sys.print_exception(e)
-      print('Backend call error. Retry in 10 secs ...')
-      time.sleep(10)
+      print('Backend call error. Retry in 5 secs ...')
+      time.sleep(5)
     print('---------------------------')
       
 def emergencyMonitor():
