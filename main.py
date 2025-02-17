@@ -627,15 +627,24 @@ def backendMonitor():
       print('Backend call error. Retry in 5 secs ...')
       time.sleep(5)
     print('---------------------------')
-      
+
+def setEmergencyrgbUnitColor(setBeepColorIndex, beepColor):
+  setBlackColorIndex = setBeepColorIndex-1
+  if setBlackColorIndex == 0: setBlackColorIndex = 3
+  #print('Colors: ' + str(setBlackColorIndex) + ' ' + str(setBeepColorIndex))
+  rgbUnit.setColor(setBlackColorIndex, lcd.BLACK)
+  rgbUnit.setColor(setBeepColorIndex, beepColor)
+        
+
 def emergencyMonitor():
   global emergency, response, rgbUnit, EMERGENCY_MAX, EMERGENCY_MIN, OLD_DATA_EMERGENCY
-  vibrate = False
-  intensity = 10
+  beeperExecuted = False
+  useBeeper = False
+  setColorIndex = 2
+  
   while True:
     #print('Emergency monitor checking status')
     if emergency == True:
-      useBeeper = checkBeeper()
       batteryLevel = getBatteryLevel()
       sgv = response[0]['sgv']
       if batteryLevel < 20:
@@ -649,59 +658,31 @@ def emergencyMonitor():
       if sgv > EMERGENCY_MAX: beepColor = lcd.ORANGE  
       
       if emergency == True:
-        rgbUnit.setColor(1, lcd.BLACK)
-        rgbUnit.setColor(2, beepColor)
+        setEmergencyrgbUnitColor(setColorIndex, beepColor)
+        setColorIndex += 1
+        if setColorIndex > 3: setColorIndex = 1 
+        if beeperExecuted == False:
+          useBeeper = checkBeeper()
         if useBeeper == True:
-          #speaker.playTone(523, 2, volume=2)
-          vibrate = not vibrate
-          #intensity += 1
-          #if intensity > 100: intensity = 0
-          power.setVibrationEnable(vibrate) 
-          power.setVibrationIntensity(intensity)   
-        time.sleep(0.5)
-      else:
-        vibrate = False
-        #intensity = 20
-        power.setVibrationEnable(vibrate)  
+          power.setVibrationEnable(True) 
+          power.setVibrationIntensity(75)
+          time.sleep(1)
+          setEmergencyrgbUnitColor(setColorIndex, beepColor)
+          setColorIndex += 1
+          if setColorIndex > 3: setColorIndex = 1 
+          time.sleep(1)
+          power.setVibrationEnable(False)
+          beeperExecuted = True   
+          useBeeper = False           
+        else:
+          time.sleep(1)
       
-      if emergency == True:    
-        rgbUnit.setColor(2, lcd.BLACK)
-        rgbUnit.setColor(3, beepColor)
-        if useBeeper == True:
-          #speaker.playTone(523, 2, volume=2)
-          vibrate = not vibrate
-          #intensity += 1
-          #if intensity > 100: intensity = 0
-          power.setVibrationEnable(vibrate) 
-          power.setVibrationIntensity(intensity)  
-        time.sleep(0.5)
-      else:
-        vibrate = False
-        #intensity = 20  
-        power.setVibrationEnable(vibrate)
-      
-      if emergency == True:
-        rgbUnit.setColor(3, lcd.BLACK)
-        rgbUnit.setColor(1, beepColor)
-        if useBeeper == True:
-          #speaker.playTone(523, 2, volume=2)
-          vibrate = not vibrate
-          #intensity += 1
-          #if intensity > 100: intensity = 0
-          power.setVibrationEnable(vibrate) 
-          power.setVibrationIntensity(intensity)  
-        time.sleep(0.5)
-      else:
-        vibrate = False
-        #intensity = 20          
-        power.setVibrationEnable(vibrate)
-
     else:
-      vibrate = False
-      intensity = 10  
-      #power.setVibrationEnable(vibrate)
-      #print('No emergency status')
-      time.sleep(2)
+      #print('No Emergency')
+      beeperExecuted = False
+      useBeeper = False
+      setColorIndex = 2
+      time.sleep(1)
 
 #accelerator
 def mpuMonitor():
