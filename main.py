@@ -635,7 +635,6 @@ def setEmergencyrgbUnitColor(setBeepColorIndex, beepColor):
   rgbUnit.setColor(setBlackColorIndex, lcd.BLACK)
   rgbUnit.setColor(setBeepColorIndex, beepColor)
         
-
 def emergencyMonitor():
   global emergency, response, rgbUnit, EMERGENCY_MAX, EMERGENCY_MIN, OLD_DATA_EMERGENCY
   beeperExecuted = False
@@ -665,12 +664,12 @@ def emergencyMonitor():
           useBeeper = checkBeeper()
         if useBeeper == True:
           power.setVibrationEnable(True) 
-          power.setVibrationIntensity(75)
+          power.setVibrationIntensity(50)
           time.sleep(1)
-          setEmergencyrgbUnitColor(setColorIndex, beepColor)
-          setColorIndex += 1
-          if setColorIndex > 3: setColorIndex = 1 
-          time.sleep(1)
+          #setEmergencyrgbUnitColor(setColorIndex, beepColor)
+          #setColorIndex += 1
+          #if setColorIndex > 3: setColorIndex = 1 
+          #time.sleep(1)
           power.setVibrationEnable(False)
           beeperExecuted = True   
           useBeeper = False           
