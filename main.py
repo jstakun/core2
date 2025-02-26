@@ -199,6 +199,14 @@ def checkBeeper():
     sys.print_exception(e)
     return True   
 
+def getRtcDatetime():
+  now_datetime = None
+  for i in range(3):
+    now_datetime = rtc.datetime()
+    if now_datetime[0] >= YEAR:
+      return now_datetime
+  raise ValueError('Invalid datetime: ' + str(now_datetime))
+
 def printCenteredText(msg, font=lcd.FONT_DejaVu24, backgroundColor=lcd.BLACK, textColor=lcd.WHITE, clear=False):
   global mode
   rotate = 0
@@ -293,9 +301,7 @@ def printLocaltime(localtime=None, useLock=False, silent=False):
   global prevTimeStr, mode, secondsDiff
   try: 
     if localtime == None:
-      now_datetime = rtc.datetime()
-      if now_datetime[0] < YEAR:
-        raise ValueError('Invalid datetime: ' + str(now_datetime))
+      now_datetime = getRtcDatetime()
       now = utime.mktime((now_datetime[0], now_datetime[1], now_datetime[2], now_datetime[4], now_datetime[5], now_datetime[6],0,0))  + secondsDiff
       localtime = utime.localtime(now)
     h = str(localtime[3])
@@ -324,109 +330,111 @@ def printScreen(newestEntry, clear=False, noNetwork=False):
   global response, mode, brightness, emergency, emergencyPause, MIN, MAX, EMERGENCY_MIN, EMERGENCY_MAX, startTime, rgbUnit, secondsDiff, OLD_DATA, OLD_DATA_EMERGENCY, headerColor, middleColor, footerColor, prevDateStr, prevSgvDiffStr, prevBatteryStr, prevTimeStr, prevSgvStr, prevX, prevY, prevDirectionStr 
   #320*240
   
-  currentMode = mode
-
-  s = utime.time()
-  print('Printing screen in ' + MODES[currentMode] + ' mode')
-  
-  sgv = newestEntry['sgv']
-  sgvStr = str(sgv)
-  
-  directionStr = newestEntry['direction']
-  sgvDateStr = newestEntry['date']
-  
-  now_datetime = rtc.datetime()
-  if now_datetime[0] < YEAR:
-    raise ValueError('Invalid datetime: ' + str(now_datetime))
-  now = utime.mktime((now_datetime[0], now_datetime[1], now_datetime[2], now_datetime[4], now_datetime[5], now_datetime[6],0,0))  + secondsDiff
-  #localtime = utime.localtime(now)
-  
-  tooOld = False
-  try:
-    tooOld = isOlderThan(sgvDateStr, OLD_DATA, now, print_time=True)
-  except Exception as e:
-    sys.print_exception(e)
-  #print("Is sgv data older than " + str(OLD_DATA) + " minutes?", tooOld)  
-  
-  if tooOld: backgroundColor=lcd.DARKGREY; emergency=False
-  elif sgv <= EMERGENCY_MIN: backgroundColor=lcd.RED; emergency=(utime.time() > emergencyPause and not tooOld)  
-  elif sgv >= (MIN-10) and sgv < MIN and directionStr.endswith("Up"): backgroundColor=lcd.DARKGREEN; emergency=False
-  elif sgv > EMERGENCY_MIN and sgv < MIN: backgroundColor=lcd.RED; emergency=False
-  elif sgv >= MIN and sgv <= MAX: backgroundColor=lcd.DARKGREEN; emergency=False 
-  elif sgv > MAX and sgv <= (MAX+10) and directionStr.endswith("Down"): backgroundColor=lcd.DARKGREEN; emergency=False
-  elif sgv > MAX and sgv <= EMERGENCY_MAX: backgroundColor=lcd.ORANGE; emergency=False
-  elif sgv > EMERGENCY_MAX: backgroundColor=lcd.ORANGE; emergency=(utime.time() > emergencyPause and not tooOld)  
-  
-  #battery level emergency
-  batteryLevel = getBatteryLevel()
-  uptime = utime.time() - startTime  
-  if (batteryLevel < 20 and batteryLevel > 0 and uptime > 300) and (utime.time() > emergencyPause) and not power.getChargeState(): 
-    emergency = True
-    if currentMode < 4 or currentMode == 7: currentMode = 2
-    else: currentMode = 6
-    clear = True
-
-  #old data emergency
-  if utime.time() > emergencyPause and isOlderThan(sgvDateStr, OLD_DATA_EMERGENCY, now):
-    emergency = True
-    clear = True   
-
-  if emergency == False:
-    rgbUnit.setColor(1, lcd.BLACK)
-    rgbUnit.setColor(2, backgroundColor)
-    rgbUnit.setColor(3, lcd.BLACK)
-
-  #if emergency change to one of full modes 
-  if emergency == True and (currentMode == 3 or currentMode == 7): currentMode = 0
-  
-  if noNetwork == False and "ago" in newestEntry and (currentMode == 0 or currentMode == 4): 
-    dateStr = newestEntry['ago']
-  elif currentMode == 2 or currentMode == 6:
-    if batteryLevel >= 0:
-       dateStr = "Battery: " + str(batteryLevel) + "%"
-    else: 
-       dateStr = "Battery level unknown"
-  else:   
-    dateStr = sgvDateStr.replace("T", " ")[:-3] #remove seconds
-  
-  if not tooOld and directionStr == 'DoubleUp' and sgv+20>=MAX and sgv<MAX: arrowColor = lcd.ORANGE
-  elif not tooOld and directionStr == 'DoubleUp' and sgv>=MAX: arrowColor = lcd.RED
-  elif not tooOld and directionStr == 'DoubleDown' and sgv-20<=MIN: arrowColor = lcd.RED
-  elif not tooOld and directionStr.endswith('Up') and sgv+10>=MAX and sgv<MAX: arrowColor = lcd.ORANGE
-  elif not tooOld and directionStr.endswith('Down') and sgv-10<=MIN: arrowColor = lcd.RED
-  else: arrowColor = backgroundColor  
-
-  batteryStr = str(batteryLevel) + '%'
-
-  sgvDiff = 0
-  if len(response) > 1: sgvDiff = sgv - response[1]['sgv']
-  sgvDiffStr = str(sgvDiff)
-  if sgvDiff > 0: sgvDiffStr = "+" + sgvDiffStr
-   
-  if clear:
-    headerColor = None
-    middleColor = None
-    footerColor = None
-    prevX = None
-    prevY = None
-    prevDirectionStr = None
-    prevDateStr = None 
-    prevSgvDiffStr = None
-    prevBatteryStr = None 
-    prevTimeStr = None 
-    prevSgvStr = None
+  now_datetime = getRtcDatetime()
     
   locked = printScreenLock.acquire()
 
   if locked == True: 
+
+    currentMode = mode
+
+    s = utime.time()
+    print('Printing screen in ' + MODES[currentMode] + ' mode')
+  
+    sgv = newestEntry['sgv']
+    sgvStr = str(sgv)
+  
+    directionStr = newestEntry['direction']
+    sgvDateStr = newestEntry['date']
+  
+    now = utime.mktime((now_datetime[0], now_datetime[1], now_datetime[2], now_datetime[4], now_datetime[5], now_datetime[6],0,0))  + secondsDiff
+    #localtime = utime.localtime(now)
+  
+    tooOld = False
+    try:
+      tooOld = isOlderThan(sgvDateStr, OLD_DATA, now, print_time=True)
+    except Exception as e:
+      sys.print_exception(e)
+    #print("Is sgv data older than " + str(OLD_DATA) + " minutes?", tooOld)  
+  
+    if tooOld: backgroundColor=lcd.DARKGREY; emergency=False
+    elif sgv <= EMERGENCY_MIN: backgroundColor=lcd.RED; emergency=(utime.time() > emergencyPause and not tooOld)  
+    elif sgv >= (MIN-10) and sgv < MIN and directionStr.endswith("Up"): backgroundColor=lcd.DARKGREEN; emergency=False
+    elif sgv > EMERGENCY_MIN and sgv < MIN: backgroundColor=lcd.RED; emergency=False
+    elif sgv >= MIN and sgv <= MAX: backgroundColor=lcd.DARKGREEN; emergency=False 
+    elif sgv > MAX and sgv <= (MAX+10) and directionStr.endswith("Down"): backgroundColor=lcd.DARKGREEN; emergency=False
+    elif sgv > MAX and sgv <= EMERGENCY_MAX: backgroundColor=lcd.ORANGE; emergency=False
+    elif sgv > EMERGENCY_MAX: backgroundColor=lcd.ORANGE; emergency=(utime.time() > emergencyPause and not tooOld)  
+  
+    #battery level emergency
+    batteryLevel = getBatteryLevel()
+    uptime = utime.time() - startTime  
+    if (batteryLevel < 20 and batteryLevel > 0 and uptime > 300) and (utime.time() > emergencyPause) and not power.getChargeState(): 
+      emergency = True
+      if currentMode < 4 or currentMode == 7: currentMode = 2
+      else: currentMode = 6
+      clear = True
+
+    #old data emergency
+    if utime.time() > emergencyPause and isOlderThan(sgvDateStr, OLD_DATA_EMERGENCY, now):
+      emergency = True
+      clear = True   
+
+    if emergency == False:
+      rgbUnit.setColor(1, lcd.BLACK)
+      rgbUnit.setColor(2, backgroundColor)
+      rgbUnit.setColor(3, lcd.BLACK)
+
+    #if emergency change to one of full modes 
+    if emergency == True and (currentMode == 3 or currentMode == 7): currentMode = 0
+  
+    if noNetwork == False and "ago" in newestEntry and (currentMode == 0 or currentMode == 4): 
+      dateStr = newestEntry['ago']
+    elif currentMode == 2 or currentMode == 6:
+      if batteryLevel >= 0:
+       dateStr = "Battery: " + str(batteryLevel) + "%"
+      else: 
+       dateStr = "Battery level unknown"
+    else:   
+      dateStr = sgvDateStr.replace("T", " ")[:-3] #remove seconds
+  
+    if not tooOld and directionStr == 'DoubleUp' and sgv+20>=MAX and sgv<MAX: arrowColor = lcd.ORANGE
+    elif not tooOld and directionStr == 'DoubleUp' and sgv>=MAX: arrowColor = lcd.RED
+    elif not tooOld and directionStr == 'DoubleDown' and sgv-20<=MIN: arrowColor = lcd.RED
+    elif not tooOld and directionStr.endswith('Up') and sgv+10>=MAX and sgv<MAX: arrowColor = lcd.ORANGE
+    elif not tooOld and directionStr.endswith('Down') and sgv-10<=MIN: arrowColor = lcd.RED
+    else: arrowColor = backgroundColor  
+
+    batteryStr = str(batteryLevel) + '%'
+
+    sgvDiff = 0
+    if len(response) > 1: sgvDiff = sgv - response[1]['sgv']
+    sgvDiffStr = str(sgvDiff)
+    if sgvDiff > 0: sgvDiffStr = "+" + sgvDiffStr
+   
+    if clear:
+      headerColor = None
+      middleColor = None
+      footerColor = None
+      prevX = None
+      prevY = None
+      prevDirectionStr = None
+      prevDateStr = None 
+      prevSgvDiffStr = None
+      prevBatteryStr = None 
+      prevTimeStr = None 
+      prevSgvStr = None
+    
     if headerColor != lcd.DARKGREY:
       headerColor = lcd.DARKGREY
       lcd.fillRect(0, 0, 360, 50, lcd.DARKGREY)
+
     if backgroundColor != middleColor:
       middleColor = backgroundColor 
       lcd.fillRect(0, 48, 360, 140, backgroundColor)
       prevDirectionStr = None
       prevSgvStr = None
+    
     if footerColor != lcd.DARKGREY:
       footerColor = lcd.DARKGREY     
       lcd.fillRect(0, 192, 360, 50, lcd.DARKGREY)
@@ -875,12 +883,9 @@ printCenteredText("Setting time...", backgroundColor=lcd.DARKGREY) #lcd.GREENYEL
 
 try: 
   rtc.settime('ntp', host='pool.ntp.org', tzone=1) #UTC 
-  now_datetime = rtc.datetime() 
-  if now_datetime[0] < YEAR: 
-    raise ValueError('Invalid datetime: ' + str(now_datetime))
-  else:                                              
-    print("Current UTC datetime " +  str(now_datetime))
-    startTime = utime.time()
+  now_datetime = getRtcDatetime()
+  print("Current UTC datetime " +  str(now_datetime))
+  startTime = utime.time()
 except Exception as e:
   sys.print_exception(e)
   printCenteredText("Failed to set time!", backgroundColor=lcd.RED, clear=True)
