@@ -24,7 +24,7 @@ EMERGENCY_PAUSE_INTERVAL = 1800  #sec = 30 mins
 MODES = ["full_elapsed", "full_date", "full_battery", "basic", "flip_full_elapsed", "flip_full_date", "flip_full_battery", "chart", "flip_chart"]
 SGVDICT_FILE = 'sgvdict.txt'
 RESPONSE_FILE = 'response.txt'
-BACKEND_TIMEOUT_MS = 60000
+BACKEND_TIMEOUT_MS = 12000 #max 60000
 MAX_SAVED_ENTRIES = 10
 YEAR = 2025
 
@@ -356,29 +356,33 @@ def printScreen(newestEntry, clear=False, noNetwork=False):
     except Exception as e:
       sys.print_exception(e)
     #print("Is sgv data older than " + str(OLD_DATA) + " minutes?", tooOld)  
+
+    emergencyNew = None
   
-    if tooOld: backgroundColor=lcd.DARKGREY; emergency=False
-    elif sgv <= EMERGENCY_MIN: backgroundColor=lcd.RED; emergency=(utime.time() > emergencyPause and not tooOld)  
-    elif sgv >= (MIN-10) and sgv < MIN and directionStr.endswith("Up"): backgroundColor=lcd.DARKGREEN; emergency=False
-    elif sgv > EMERGENCY_MIN and sgv < MIN: backgroundColor=lcd.RED; emergency=False
-    elif sgv >= MIN and sgv <= MAX: backgroundColor=lcd.DARKGREEN; emergency=False 
-    elif sgv > MAX and sgv <= (MAX+10) and directionStr.endswith("Down"): backgroundColor=lcd.DARKGREEN; emergency=False
-    elif sgv > MAX and sgv <= EMERGENCY_MAX: backgroundColor=lcd.ORANGE; emergency=False
-    elif sgv > EMERGENCY_MAX: backgroundColor=lcd.ORANGE; emergency=(utime.time() > emergencyPause and not tooOld)  
+    if tooOld: backgroundColor=lcd.DARKGREY; emergencyNew=False
+    elif sgv <= EMERGENCY_MIN: backgroundColor=lcd.RED; emergencyNew=(utime.time() > emergencyPause and not tooOld)  
+    elif sgv >= (MIN-10) and sgv < MIN and directionStr.endswith("Up"): backgroundColor=lcd.DARKGREEN; emergencyNew=False
+    elif sgv > EMERGENCY_MIN and sgv < MIN: backgroundColor=lcd.RED; emergencyNew=False
+    elif sgv >= MIN and sgv <= MAX: backgroundColor=lcd.DARKGREEN; emergencyNew=False 
+    elif sgv > MAX and sgv <= (MAX+10) and directionStr.endswith("Down"): backgroundColor=lcd.DARKGREEN; emergencyNew=False
+    elif sgv > MAX and sgv <= EMERGENCY_MAX: backgroundColor=lcd.ORANGE; emergencyNew=False
+    elif sgv > EMERGENCY_MAX: backgroundColor=lcd.ORANGE; emergencyNew=(utime.time() > emergencyPause and not tooOld)  
   
     #battery level emergency
     batteryLevel = getBatteryLevel()
     uptime = utime.time() - startTime  
-    if (batteryLevel < 20 and batteryLevel > 0 and uptime > 300) and (utime.time() > emergencyPause) and not power.getChargeState(): 
-      emergency = True
+    if (batteryLevel < 10 and batteryLevel > 0 and uptime > 300) and (utime.time() > emergencyPause) and not power.getChargeState(): 
+      emergencyNew = True
       if currentMode < 4 or currentMode == 7: currentMode = 2
       else: currentMode = 6
       clear = True
 
     #old data emergency
     if utime.time() > emergencyPause and isOlderThan(sgvDateStr, OLD_DATA_EMERGENCY, now):
-      emergency = True
+      emergencyNew = True
       clear = True   
+
+    emergency = emergencyNew  
 
     if emergency == False:
       rgbUnit.setColor(1, lcd.BLACK)
@@ -644,8 +648,7 @@ def setEmergencyrgbUnitColor(setBeepColorIndex, beepColor):
   rgbUnit.setColor(setBeepColorIndex, beepColor)
         
 def emergencyMonitor():
-  global emergency, response, rgbUnit, EMERGENCY_MAX, EMERGENCY_MIN, OLD_DATA_EMERGENCY
-  beeperExecuted = False
+  global emergency, response, rgbUnit, beeperExecuted, EMERGENCY_MAX, EMERGENCY_MIN, OLD_DATA_EMERGENCY
   useBeeper = False
   setColorIndex = 2
   
@@ -654,7 +657,7 @@ def emergencyMonitor():
     if emergency == True:
       batteryLevel = getBatteryLevel()
       sgv = response[0]['sgv']
-      if batteryLevel < 20:
+      if batteryLevel < 10:
         print('Low battery level ' + str(batteryLevel) + "%!!!")
       elif sgv > EMERGENCY_MAX or sgv <= EMERGENCY_MIN:
         print('Emergency glucose level ' + str(sgv) + '!!!')
@@ -663,27 +666,22 @@ def emergencyMonitor():
       
       beepColor = lcd.RED
       if sgv > EMERGENCY_MAX: beepColor = lcd.ORANGE  
-      
-      if emergency == True:
-        setEmergencyrgbUnitColor(setColorIndex, beepColor)
-        setColorIndex += 1
-        if setColorIndex > 3: setColorIndex = 1 
-        if beeperExecuted == False:
-          useBeeper = checkBeeper()
-        if useBeeper == True:
-          power.setVibrationEnable(True) 
-          power.setVibrationIntensity(50)
-          time.sleep(1)
-          #setEmergencyrgbUnitColor(setColorIndex, beepColor)
-          #setColorIndex += 1
-          #if setColorIndex > 3: setColorIndex = 1 
-          #time.sleep(1)
-          power.setVibrationEnable(False)
-          beeperExecuted = True   
-          useBeeper = False           
-        else:
-          time.sleep(1)
-      
+
+      setEmergencyrgbUnitColor(setColorIndex, beepColor)
+      setColorIndex += 1
+      if setColorIndex > 3: setColorIndex = 1 
+      if beeperExecuted == False:
+        useBeeper = checkBeeper()
+      if useBeeper == True:
+        power.setVibrationEnable(True) 
+        power.setVibrationIntensity(50)
+        time.sleep(1)
+        power.setVibrationEnable(False)
+        beeperExecuted = True   
+        useBeeper = False 
+      else:
+        time.sleep(1)
+      print("beeperExecuted=" + str(beeperExecuted) + ", useBeeper=" + str(useBeeper))              
     else:
       #print('No Emergency')
       beeperExecuted = False
@@ -780,6 +778,7 @@ emergency = False
 emergencyPause = 0
 shuttingDown = False
 backendResponse = None
+beeperExecuted = False
 
 mode = 0
 mpu = IMU()
