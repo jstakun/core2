@@ -63,7 +63,7 @@ def isOlderThan(date_str, mins, now_seconds, print_time=False):
   diff = (now_seconds - the_date_seconds)
   if print_time == True:
      printTime(diff, prefix='Entry read', suffix='ago')
-  return diff > (60 * mins)   
+  return (diff > (60 * mins) and getBatteryLevel() >= 5)  
 
 def getDateTuple(date_str):
   [yyyy, mm, dd] = [int(i) for i in date_str.split('T')[0].split('-')]
@@ -162,7 +162,7 @@ def persistEntries():
 def checkBeeper():
   global USE_BEEPER, BEEPER_START_TIME, BEEPER_END_TIME, secondsDiff 
   try:   
-    if USE_BEEPER == 1:
+    if (USE_BEEPER == 1 and getBatteryLevel() >= 5):
       d = utime.localtime(0)
       now_datetime = rtc.datetime() 
       if now_datetime[0] < YEAR:
@@ -881,7 +881,7 @@ print("")
 printCenteredText("Setting time...", backgroundColor=lcd.DARKGREY) #lcd.GREENYELLOW)
 
 try: 
-  rtc.settime('ntp', host='pool.ntp.org', tzone=1) #UTC 
+  rtc.settime('ntp', host='pool.ntp.org', tzone=0) #GMT
   now_datetime = getRtcDatetime()
   print("Current UTC datetime " +  str(now_datetime))
   startTime = utime.time()
