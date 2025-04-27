@@ -809,8 +809,6 @@ if config == None or config == 0:
    ap.open_access_point(reboot)  
 else:
    try: 
-     SSID = nvs.read_str('ssid')
-     WIFI_PASSWORD = nvs.read_str('wifi_password')
      API_ENDPOINT = nvs.read_str("api-endpoint")
      API_TOKEN = nvs.read_str("api-token")
      LOCALE = nvs.read_str("locale")
@@ -830,8 +828,6 @@ else:
      if EMERGENCY_MIN < 30 or MIN <= EMERGENCY_MIN: EMERGENCY_MIN=MIN-10
      if EMERGENCY_MAX < 100 or MAX >= EMERGENCY_MAX: EMERGENCY_MAX=MAX+10  
      if len(API_ENDPOINT) == 0: raise Exception("Empty api-endpoint parameter")
-     if len(SSID) == 0: raise Exception("Empty ssid parameter") 
-     if len(WIFI_PASSWORD) == 0: raise Exception("Empty wifi password parameter") 
      if USE_BEEPER != 1 and USE_BEEPER != 0: USE_BEEPER=1
      if re.search("^GMT[+-]((0?[0-9]|1[0-1]):([0-5][0-9])|12:00)$",TIMEZONE) == None: TIMEZONE="GMT+0:00"
      if OLD_DATA < 10: OLD_DATA=10
@@ -858,21 +854,23 @@ nic.active(True)
 
 printCenteredText("Scanning wifi ...", backgroundColor=lcd.DARKGREY)
 
-found = False
-while not found:
+wifi_password = None
+wifi_ssid = None
+while wifi_password == None:
   try: 
     nets = nic.scan()
     for result in nets:
-      ssid = result[0].decode() 
-      if ssid == SSID: found = True; break
+      wifi_ssid = result[0].decode() 
+      wifi_password = nvs.read_str(wifi_ssid[0:15])
+      if wifi_password != None: break
   except Exception as e:
       sys.print_exception(e)
       printCenteredText("Wifi not found!", backgroundColor=lcd.RED, clear=True)  
-  if not found: time.sleep(1)
+  if wifi_password == None: time.sleep(1)
 
 printCenteredText("Connecting wifi...", backgroundColor=lcd.DARKGREY) #lcd.OLIVE)
-nic.connect(SSID, WIFI_PASSWORD)
-print('Connecting wifi ' + SSID)
+nic.connect(wifi_ssid, wifi_password)
+print('Connecting wifi ' + wifi_ssid)
 while not nic.isconnected():
   print(".", end="")
   time.sleep(0.25)
@@ -881,7 +879,7 @@ print("")
 printCenteredText("Setting time...", backgroundColor=lcd.DARKGREY) #lcd.GREENYELLOW)
 
 try: 
-  rtc.settime('ntp', host='pool.ntp.org', tzone=0) #GMT
+  rtc.settime('ntp', host='pool.ntp.org', tzone=1) #GMT
   now_datetime = getRtcDatetime()
   print("Current UTC datetime " +  str(now_datetime))
   startTime = utime.time()

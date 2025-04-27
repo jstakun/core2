@@ -81,7 +81,7 @@ def open_access_point(successCallback):
     print('Content = %s' % contentStr)
     splittedRequest = contentStr.split()
     #rmethod = splittedRequest[0]
-    rurl    = splittedRequest[1]
+    rurl = splittedRequest[1]
   
     conn.send('HTTP/1.1 200 OK\n')
     conn.send('Content-Type: text/html\n')
@@ -92,14 +92,22 @@ def open_access_point(successCallback):
       configParams = splittedRequest[len(splittedRequest)-1]
       print('Config params: ' + configParams) 
       entries = configParams.split('&') 
+      wifi_ssid = None
+      wifi_password = None
       for entry in entries:
         [k,v] = entry.split('=')
         #max nvs key length = 15
         if len(k) > 15: k = k[0:15]
         value = unquote(v).decode()
-        if value.isdigit(): value = int(value) 
-        nvs.write(k, value)
-        print("Saved config parameter " + k)
+        if k == 'ssid': wifi_ssid = value
+        elif k == 'wifi_password': wifi_password = value  
+        elif value.isdigit(): value = int(value) 
+        if k != 'ssid' and k != 'wifi_password':
+          nvs.write(k, value)
+          print("Saved config parameter " + k)
+      if len(wifi_ssid) > 15: wifi_ssid = wifi_ssid[0:15]    
+      nvs.write(wifi_ssid, wifi_password)
+      print("Saved config parameter " + wifi_ssid)
       nvs.write(CONFIG, 1)  
       successCallback()
       conn.send(successHtml)   
