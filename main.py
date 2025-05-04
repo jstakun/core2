@@ -879,7 +879,7 @@ print("")
 printCenteredText("Setting time...", backgroundColor=lcd.DARKGREY) #lcd.GREENYELLOW)
 
 try: 
-  rtc.settime('ntp', host='pool.ntp.org', tzone=0) #UTC
+  rtc.settime('ntp', host='pool.ntp.org', tzone=0) #UTC = GMT+0
   now_datetime = getRtcDatetime()
   print("Current UTC datetime " +  str(now_datetime))
   startTime = utime.time()
