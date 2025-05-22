@@ -187,17 +187,19 @@ def checkBeeper():
       d2[4] = MM
       d2[5] = SS
 
-      #print("Compare d1: " + str(d1) + ", d2: " + str(d2) + ", c: " + str(c))
+      #print("Compare start: " + str(d1) + ", end: " + str(d2) + ", current: " + str(c))
       
       if tuple(d1) < tuple(d2):
+         #d1 start | current | d2 end 
          return tuple(c) > tuple(d1) and tuple(c) < tuple(d2)
       else:
+         # current | d2 end | or | d1 start | current 
          return tuple(c) > tuple(d1) or tuple(c) < tuple(d2)
     else:
       return False 
   except Exception as e:
     sys.print_exception(e)
-    return True   
+    return False   
 
 def getRtcDatetime():
   now_datetime = None
