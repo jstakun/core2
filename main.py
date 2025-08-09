@@ -24,7 +24,7 @@ EMERGENCY_PAUSE_INTERVAL = 1800  #sec = 30 mins
 MODES = ["full_elapsed", "full_date", "full_battery", "basic", "flip_full_elapsed", "flip_full_date", "flip_full_battery", "chart", "flip_chart"]
 SGVDICT_FILE = 'sgvdict.txt'
 RESPONSE_FILE = 'response.txt'
-BACKEND_TIMEOUT_MS = 12000 #max 60000
+BACKEND_TIMEOUT_MS = 30000 #max 60000
 MAX_SAVED_ENTRIES = 10
 YEAR = 2025
 
@@ -604,7 +604,7 @@ def backendMonitor():
       print('Free memory: ' + str(gc.mem_free()) + ' bytes')
       print('Allocated memory: ' + str(gc.mem_alloc()) + ' bytes')
       printTime((utime.time() - startTime), prefix='Uptime is')
-      print('Calling backend ...')
+      print("Calling backend with timeout " + str(BACKEND_TIMEOUT_MS) + " ms ...")
       s = utime.time()
       backendResponseTimer.init(mode=machine.Timer.ONE_SHOT, period=BACKEND_TIMEOUT_MS+10000, callback=watchdogCallback)
       backendResponse = urequests.get(API_ENDPOINT + "/entries.json?count=10&waitfornextid=" + str(lastid) + "&timeout=" + str(BACKEND_TIMEOUT_MS), headers={'api-secret': API_TOKEN,'accept-language': LOCALE,'accept-charset': 'ascii', 'x-gms-tz': TIMEZONE})
@@ -721,8 +721,11 @@ def touchPadCallback(t):
       onBtnPressed()
 
 def watchdogCallback(t):
-  global shuttingDown, backendResponse 
+  global shuttingDown, backendResponse, rgbUnit
   print('Restarting due to backend communication failure ...')
+  rgbUnit.setColor(1, lcd.BLACK)
+  rgbUnit.setColor(2, lcd.DARKGREY)
+  rgbUnit.setColor(3, lcd.BLACK)
   if backendResponse != None: backendResponse.close()
   machine.WDT(timeout=1000)   
   shuttingDown = True
@@ -848,7 +851,13 @@ else:
      machine.WDT(timeout=1000)
      shuttingDown = True
      printCenteredText("Restarting...", backgroundColor=lcd.RED, clear=True)
+
+# activate buttons to enable configuration changes     
   
+btnA.wasPressed(onBtnPressed)
+btnB.wasPressed(onBtnBPressed)
+btnC.wasPressed(onBtnPressed)
+
 # from here code runs only if application is properly configured
 
 nic = network.WLAN(network.STA_IF)
@@ -900,10 +909,6 @@ printCenteredText("Loading data...", backgroundColor=lcd.DARKGREY) #lcd.DARKGREE
 sgvDict = readSgvFile()
 dictLen = len(sgvDict)
 print("Loaded " + str(dictLen) + " sgv entries")
-
-btnA.wasPressed(onBtnPressed)
-btnB.wasPressed(onBtnBPressed)
-btnC.wasPressed(onBtnPressed)
 
 #max 4 timers 0-3
 
