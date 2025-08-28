@@ -1,6 +1,4 @@
 from m5stack import *
-from m5stack_ui import *
-from uiflow import *
 import math
 import os
 import time
@@ -19,6 +17,7 @@ import re
 import json
 import nvs
 import ap
+#from weather import printWeatherMonitor
 
 EMERGENCY_PAUSE_INTERVAL = 1800  #sec = 30 mins
 MODES = ["full_elapsed", "full_date", "full_battery", "basic", "flip_full_elapsed", "flip_full_date", "flip_full_battery", "chart", "flip_chart"]
@@ -237,9 +236,9 @@ def printText(msg, x, y, cleanupMsg, font=lcd.FONT_DejaVu24, backgroundColor=lcd
      if silent == False: 
        print("Clearing " + cleanupMsg + ": " + str(cleanupX) + "," + str(y))
      if rotate == 0:
-       lcd.fillRect(cleanupX, math.ceil(y), math.ceil(w), math.ceil(f[1]), backgroundColor)
+       lcd.fillRect(cleanupX, math.ceil(y), math.ceil(w)+2, math.ceil(f[1]), backgroundColor)
      else:   
-       lcd.fillRect(math.ceil(cleanupX-w), math.ceil(y-f[1]), math.ceil(w), math.ceil(f[1]), backgroundColor)
+       lcd.fillRect(math.ceil(cleanupX-w), math.ceil(y-f[1]), math.ceil(w)+2, math.ceil(f[1]), backgroundColor)
   lcd.setTextColor(textColor)
   lcd.print(msg, x, y)
   if silent == False:
@@ -329,7 +328,7 @@ def printLocaltime(localtime=None, useLock=False, silent=False):
     sys.print_exception(e)
 
 def printScreen(newestEntry, clear=False, noNetwork=False):
-  global response, mode, brightness, emergency, emergencyPause, MIN, MAX, EMERGENCY_MIN, EMERGENCY_MAX, startTime, rgbUnit, secondsDiff, OLD_DATA, OLD_DATA_EMERGENCY, headerColor, middleColor, footerColor, prevDateStr, prevSgvDiffStr, prevBatteryStr, prevTimeStr, prevSgvStr, prevX, prevY, prevDirectionStr 
+  global response, mode, brightness, emergency, emergencyPause, MIN, MAX, EMERGENCY_MIN, EMERGENCY_MAX, startTime, rgbUnit, secondsDiff, OLD_DATA, OLD_DATA_EMERGENCY, headerColor, middleColor, footerColor, prevDateStr, prevSgvDiffStr, prevBatteryStr, prevTimeStr, prevSgvStr, prevX, prevY, prevDirectionStr, batteryStrIndex, envUnit 
   #320*240
   
   now_datetime = getRtcDatetime()
@@ -386,7 +385,7 @@ def printScreen(newestEntry, clear=False, noNetwork=False):
 
     emergency = emergencyNew  
 
-    if emergency == False:
+    if emergency == False and rgbUnit != None:
       rgbUnit.setColor(1, lcd.BLACK)
       rgbUnit.setColor(2, backgroundColor)
       rgbUnit.setColor(3, lcd.BLACK)
@@ -412,6 +411,18 @@ def printScreen(newestEntry, clear=False, noNetwork=False):
     else: arrowColor = backgroundColor  
 
     batteryStr = str(batteryLevel) + '%'
+    if envUnit != None and batteryLevel > 20:
+      if batteryStrIndex == 1: 
+        batteryStr = "%.0fC" % envUnit.temperature
+        batteryStrIndex = 2
+      elif batteryStrIndex == 2:
+        batteryStr = 'p'+ "%.0f" % envUnit.pressure
+        batteryStrIndex = 3
+      elif batteryStrIndex == 3:
+        batteryStr = 'h' + "%.0f" % envUnit.humidity + '%'
+        batteryStrIndex = 0  
+      else:
+        batteryStrIndex = 1  
 
     sgvDiff = 0
     if len(response) > 1: sgvDiff = sgv - response[1]['sgv']
@@ -646,8 +657,9 @@ def setEmergencyrgbUnitColor(setBeepColorIndex, beepColor):
   setBlackColorIndex = setBeepColorIndex-1
   if setBlackColorIndex == 0: setBlackColorIndex = 3
   #print('Colors: ' + str(setBlackColorIndex) + ' ' + str(setBeepColorIndex))
-  rgbUnit.setColor(setBlackColorIndex, lcd.BLACK)
-  rgbUnit.setColor(setBeepColorIndex, beepColor)
+  if rgbUnit != None:
+    rgbUnit.setColor(setBlackColorIndex, lcd.BLACK)
+    rgbUnit.setColor(setBeepColorIndex, beepColor)
         
 def emergencyMonitor():
   global emergency, response, rgbUnit, beeperExecuted, EMERGENCY_MAX, EMERGENCY_MIN, OLD_DATA_EMERGENCY
@@ -717,15 +729,18 @@ def touchPadCallback(t):
     print("Touch screen pressed at " + str(tx) + "," + str(ty))
     if tx >= 120 and tx <= 160 and ty >= 240 and ty <= 280:
       onBtnBPressed()
+    elif tx >= 240 and tx <= 280 and ty >= 240 and ty <= 280:
+      onBtnCPressed()  
     else:
       onBtnPressed()
 
 def watchdogCallback(t):
   global shuttingDown, backendResponse, rgbUnit
   print('Restarting due to backend communication failure ...')
-  rgbUnit.setColor(1, lcd.BLACK)
-  rgbUnit.setColor(2, lcd.DARKGREY)
-  rgbUnit.setColor(3, lcd.BLACK)
+  if rgbUnit != None:
+    rgbUnit.setColor(1, lcd.BLACK)
+    rgbUnit.setColor(2, lcd.DARKGREY)
+    rgbUnit.setColor(3, lcd.BLACK)
   if backendResponse != None: backendResponse.close()
   machine.WDT(timeout=1000)   
   shuttingDown = True
@@ -758,6 +773,15 @@ def onBtnBPressed():
   shuttingDown = True
   printCenteredText("Restarting...", backgroundColor=lcd.RED, clear=True)  
 
+def onBtnCPressed():
+  onBtnPressed()
+#  global envUnit, mode
+#  print('Button C pressed')
+#  if envUnit != None:
+#     rotate = 0
+#     if mode in range (4,7): rotate = 180
+#     printWeatherMonitor(envUnit, rotate) 
+
 # ------------------------------------------------------------------------------     
 
 brightness = int(readConfig('brightness', "32"))
@@ -765,8 +789,26 @@ screen = M5Screen()
 screen.set_screen_brightness(brightness)
 
 lcd.clear(lcd.DARKGREY)
-rgbUnit = unit.get(unit.RGB, unit.PORTA)
-rgbUnit.setColor(2, lcd.DARKGREY)
+
+envUnit = None
+try: 
+  envUnit = unit.get(unit.ENV3, unit.PORTA)
+  print('Temperature:',str(envUnit.temperature) + " C")
+  print('Humidity:',str(envUnit.humidity) + " %")
+  print('Pressure:',str(envUnit.pressure) + " hPa")
+except Exception as e:
+  print('Weather Monitoring Unit not found')
+  #sys.print_exception(e)
+
+rgbUnit = None
+try: 
+  rgbUnit = unit.get(unit.RGB, unit.PORTA)
+  rgbUnit.setColor(1, lcd.BLACK)     
+  rgbUnit.setColor(2, lcd.DARKGREY)
+  rgbUnit.setColor(3, lcd.BLACK)
+except Exception as e:
+  print('RGB Unit not found')
+  #sys.print_exception(e)
 
 print('Starting ...')
 print('APIKEY:',deviceCfg.get_apikey())
@@ -800,6 +842,7 @@ prevSgvDiffStr = None
 prevBatteryStr = None 
 prevTimeStr = None 
 prevSgvStr = None
+batteryStrIndex = 0
 
 config = nvs.read_int(ap.CONFIG)
 if config == None or config == 0:
@@ -856,7 +899,7 @@ else:
   
 btnA.wasPressed(onBtnPressed)
 btnB.wasPressed(onBtnBPressed)
-btnC.wasPressed(onBtnPressed)
+btnC.wasPressed(onBtnCPressed)
 
 # from here code runs only if application is properly configured
 
