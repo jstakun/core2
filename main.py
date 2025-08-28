@@ -411,15 +411,20 @@ def printScreen(newestEntry, clear=False, noNetwork=False):
     else: arrowColor = backgroundColor  
 
     batteryStr = str(batteryLevel) + '%'
+    batteryTextColor = lcd.WHITE
+    if batteryLevel < 20: batteryTextColor = lcd.RED
     if envUnit != None and batteryLevel > 20:
       if batteryStrIndex == 1: 
         batteryStr = "%.0fC" % envUnit.temperature
+        if envUnit.temperature > 25 or envUnit.temperature < 18: batteryTextColor = lcd.RED
         batteryStrIndex = 2
       elif batteryStrIndex == 2:
         batteryStr = 'p'+ "%.0f" % envUnit.pressure
+        if envUnit.pressure > 1050 or envUnit.pressure < 950: batteryTextColor = lcd.RED
         batteryStrIndex = 3
       elif batteryStrIndex == 3:
         batteryStr = 'h' + "%.0f" % envUnit.humidity + '%'
+        if envUnit.humidity < 40 or envUnit.humidity > 60: batteryTextColor = lcd.RED
         batteryStrIndex = 0  
       else:
         batteryStrIndex = 1  
@@ -489,8 +494,7 @@ def printScreen(newestEntry, clear=False, noNetwork=False):
       #draw battery
       lcd.font(lcd.FONT_DejaVu24)
       if batteryStr != prevBatteryStr:
-        textColor = lcd.WHITE
-        if batteryLevel < 20 and backgroundColor != lcd.RED: textColor = lcd.RED
+        textColor = batteryTextColor
         w = lcd.textWidth(batteryStr)
         if prevBatteryStr != None: 
           cleanupX = math.ceil(315 - lcd.textWidth(prevBatteryStr))
@@ -563,8 +567,7 @@ def printScreen(newestEntry, clear=False, noNetwork=False):
       #draw battery
       lcd.font(lcd.FONT_DejaVu24)
       if batteryStr != prevBatteryStr:
-        textColor = lcd.WHITE
-        if batteryLevel < 20 and backgroundColor != lcd.RED: textColor = lcd.RED
+        textColor = batteryTextColor
         w = lcd.textWidth(batteryStr)
         if prevBatteryStr != None: 
           cleanupX = math.ceil(lcd.textWidth(prevBatteryStr)+5)
