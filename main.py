@@ -888,7 +888,7 @@ else:
      [HH, MM] = [int(i) for i in timeStr.split(':')]
      secondsDiff = HH * 3600 + MM * 60
      if TIMEZONE[3] == "-": secondsDiff = secondsDiff * -1
-     print('Local time seconds diff from UTC:', secondsDiff) 
+     print('Setting local time seconds diff from UTC:', secondsDiff) 
    except Exception as e:
      sys.print_exception(e)
      nvs.write(ap.CONFIG, 0)
@@ -933,22 +933,21 @@ while not nic.isconnected():
   time.sleep(0.25)
 print("")  
 
+time_server = 'pool.ntp.org'
 printCenteredText("Setting time...", backgroundColor=lcd.DARKGREY) #lcd.GREENYELLOW)
-
-try: 
-  rtc.settime('ntp', host='pool.ntp.org', tzone=0) #UTC = GMT+0
-  now_datetime = getRtcDatetime()
-  print("Current UTC datetime " +  str(now_datetime))
-  startTime = utime.time()
-except Exception as e:
-  sys.print_exception(e)
-  printCenteredText("Failed to set time!", backgroundColor=lcd.RED, clear=True)
-  time.sleep(2)
-  machine.WDT(timeout=1000)
-  shuttingDown = True
-  printCenteredText("Restarting...", backgroundColor=lcd.RED, clear=True)
-  print('Restarting device due to time server connection failure...')    
-  time.sleep(60) #wait until watchdog restarts device  
+print('Connecting time server ' + time_server)
+now_datetime = None
+while now_datetime is None:
+  try:
+    print(".", end="")
+    #TODO use 0.pool.ntp.org, 1.pool.ntp.org, 2.pool.ntp.org, 3.pool.ntp.org
+    rtc.settime('ntp', host=time_server, tzone=0) #UTC = GMT+0
+    now_datetime = getRtcDatetime()
+    startTime = utime.time()
+  except Exception as e:
+    sys.print_exception(e)
+    time.sleep(2)
+print("\nCurrent UTC datetime " +  str(now_datetime))
 
 printCenteredText("Loading data...", backgroundColor=lcd.DARKGREY) #lcd.DARKGREEN)
 
