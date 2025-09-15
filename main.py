@@ -17,7 +17,6 @@ import re
 import json
 import nvs
 import ap
-#from weather import printWeatherMonitor
 
 EMERGENCY_PAUSE_INTERVAL = 1800  #sec = 30 mins
 MODES = ["full_elapsed", "full_date", "full_battery", "basic", "flip_full_elapsed", "flip_full_date", "flip_full_battery", "chart", "flip_chart"]
@@ -95,19 +94,14 @@ def saveResponseFile():
   global response
   content = str(response).replace('\'','\"')
   nvs.write(RESPONSE_FILE, content)
-  #responseFile = open(RESPONSE_FILE, 'w')
-  #responseFile.write(content)
-  #responseFile.close()  
 
 def readResponseFile():
   global response
   try:
-    #responseFile = open(RESPONSE_FILE, 'r')
-    #response = json.load(responseFile)
-    #responseFile.close()
     response = json.loads(nvs.read_str(RESPONSE_FILE))
   except Exception as e:
     sys.print_exception(e)
+    saveError(e)
     response = None
     
 def saveSgvFile(sgvdict):
@@ -116,24 +110,27 @@ def saveSgvFile(sgvdict):
     items.append(str(key) + ':' + str(sgvdict[key]))
   content = '\n'.join(items)
   nvs.write(SGVDICT_FILE, content)
-  #sgvfile = open(SGVDICT_FILE, 'w')
-  #sgvfile.write(content)
-  #sgvfile.close()  
 
 def readSgvFile():
   d = OrderedDict()
   try: 
-    #sgvfile = open(SGVDICT_FILE, 'r')
-    #entries = sgvfile.read().split('\n')
-    #sgvfile.close()
-    entries = nvs.read_str(SGVDICT_FILE).split('\n')
-    for entry in entries:
-      if ":" in entry:
-        [s, v] = [int(i) for i in entry.split(':')]
-        d.update({s: v})   
+    sgvFile = nvs.read_str(SGVDICT_FILE)
+    if sgvFile != None:
+      entries = sgvFile.split('\n')
+      for entry in entries:
+        if ":" in entry:
+          [s, v] = [int(i) for i in entry.split(':')]
+          d.update({s: v})   
   except Exception as e:
     sys.print_exception(e)
+    saveError(e)
   return d 
+
+def saveError(e):
+  now = utime.ticks_cpu()
+  filename = "error" + str(now) + ".txt"
+  with open(filename, 'w') as file:
+    sys.print_exception(e, file)
 
 def persistEntries():
   global response, sgvDict
@@ -198,6 +195,7 @@ def checkBeeper():
       return False 
   except Exception as e:
     sys.print_exception(e)
+    saveError(e)
     return False   
 
 def getRtcDatetime():
@@ -326,6 +324,7 @@ def printLocaltime(localtime=None, useLock=False, silent=False):
           printScreenLock.release()
   except Exception as e:
     sys.print_exception(e)
+    saveError(e)
 
 def printScreen(newestEntry, clear=False, noNetwork=False):
   global response, mode, brightness, emergency, emergencyPause, MIN, MAX, EMERGENCY_MIN, EMERGENCY_MAX, startTime, rgbUnit, secondsDiff, OLD_DATA, OLD_DATA_EMERGENCY, headerColor, middleColor, footerColor, prevDateStr, prevSgvDiffStr, prevBatteryStr, prevTimeStr, prevSgvStr, prevX, prevY, prevDirectionStr, batteryStrIndex, envUnit 
@@ -356,6 +355,7 @@ def printScreen(newestEntry, clear=False, noNetwork=False):
       tooOld = isOlderThan(sgvDateStr, OLD_DATA, now, print_time=True)
     except Exception as e:
       sys.print_exception(e)
+      saveError(e)
     #print("Is sgv data older than " + str(OLD_DATA) + " minutes?", tooOld)  
 
     emergencyNew = None
@@ -413,21 +413,26 @@ def printScreen(newestEntry, clear=False, noNetwork=False):
     batteryStr = str(batteryLevel) + '%'
     batteryTextColor = lcd.WHITE
     if batteryLevel < 20: batteryTextColor = lcd.RED
-    if envUnit != None and batteryLevel > 20:
-      if batteryStrIndex == 1: 
-        batteryStr = "%.0fC" % envUnit.temperature
-        if envUnit.temperature > 25 or envUnit.temperature < 18: batteryTextColor = lcd.RED
-        batteryStrIndex = 2
-      elif batteryStrIndex == 2:
-        batteryStr = 'p'+ "%.0f" % envUnit.pressure
-        if envUnit.pressure > 1050 or envUnit.pressure < 950: batteryTextColor = lcd.RED
-        batteryStrIndex = 3
-      elif batteryStrIndex == 3:
-        batteryStr = 'h' + "%.0f" % envUnit.humidity + '%'
-        if envUnit.humidity < 40 or envUnit.humidity > 60: batteryTextColor = lcd.RED
-        batteryStrIndex = 0  
-      else:
-        batteryStrIndex = 1  
+    try:
+      if envUnit != None and batteryLevel > 20:
+        if batteryStrIndex == 1: 
+          batteryStr = "%.0fC" % envUnit.temperature
+          if envUnit.temperature > 25 or envUnit.temperature < 18: batteryTextColor = lcd.RED
+          batteryStrIndex = 2
+        elif batteryStrIndex == 2:
+          batteryStr = 'p'+ "%.0f" % envUnit.pressure
+          if envUnit.pressure > 1050 or envUnit.pressure < 950: batteryTextColor = lcd.RED
+          batteryStrIndex = 3
+        elif batteryStrIndex == 3:
+          batteryStr = 'h' + "%.0f" % envUnit.humidity + '%'
+          if envUnit.humidity < 40 or envUnit.humidity > 60: batteryTextColor = lcd.RED
+          batteryStrIndex = 0  
+        else:
+          batteryStrIndex = 1  
+    except Exception as e:
+      sys.print_exception(e)
+      #saveError(e)
+
 
     sgvDiff = 0
     if len(response) > 1: sgvDiff = sgv - response[1]['sgv']
@@ -643,6 +648,7 @@ def backendMonitor():
       if backendResponse != None: backendResponse.close()
       lastid = -1
       sys.print_exception(e)
+      #saveError(e)
       print('Battery level: ' + str(getBatteryLevel()) + '%')
       if response == None: readResponseFile()
       try: 
@@ -652,6 +658,7 @@ def backendMonitor():
           printCenteredText("Network error! Please wait.", backgroundColor=lcd.RED, clear=True)
       except Exception as e:
         sys.print_exception(e)
+        saveError(e)
       print('Backend call error. Retry in 5 secs ...')
       time.sleep(5)
     print('---------------------------')
@@ -738,16 +745,35 @@ def touchPadCallback(t):
       onBtnPressed()
 
 def watchdogCallback(t):
-  global shuttingDown, backendResponse, rgbUnit
-  print('Restarting due to backend communication failure ...')
-  if rgbUnit != None:
-    rgbUnit.setColor(1, lcd.BLACK)
-    rgbUnit.setColor(2, lcd.DARKGREY)
-    rgbUnit.setColor(3, lcd.BLACK)
-  if backendResponse != None: backendResponse.close()
-  machine.WDT(timeout=1000)   
-  shuttingDown = True
-  printCenteredText("Restarting...", backgroundColor=lcd.RED, clear=True)
+  global shuttingDown, backendResponse, rgbUnit, response
+
+  #if last read not older then 5 mins reprint screen
+  printed = False
+  #if response == None: readResponseFile()
+  #try: 
+  #  if response != None and len(response) >= 1: 
+  #    sgvDateStr = response[0]['date']
+  #    now_datetime = getRtcDatetime()   
+  #    now = utime.mktime((now_datetime[0], now_datetime[1], now_datetime[2], now_datetime[4], now_datetime[5], now_datetime[6],0,0))  + secondsDiff
+  #    if isOlderThan(sgvDateStr, 5, now) == False: 
+  #      printScreen(response[0], noNetwork=True)
+  #      printed = True
+  #      #backendMonitor()
+  #except Exception as e:
+  #  sys.print_exception(e)
+  #  printed = False
+
+  #otherwise    
+  if printed == False:
+    print('Restarting due to backend communication failure ...')
+    if rgbUnit != None:
+      rgbUnit.setColor(1, lcd.BLACK)
+      rgbUnit.setColor(2, lcd.DARKGREY)
+      rgbUnit.setColor(3, lcd.BLACK)
+    if backendResponse != None: backendResponse.close()
+    machine.WDT(timeout=1000)   
+    shuttingDown = True
+    printCenteredText("Restarting...", backgroundColor=lcd.RED, clear=True)
 
 def locatimeCallback(t):
   global shuttingDown 
@@ -778,12 +804,6 @@ def onBtnBPressed():
 
 def onBtnCPressed():
   onBtnPressed()
-#  global envUnit, mode
-#  print('Button C pressed')
-#  if envUnit != None:
-#     rotate = 0
-#     if mode in range (4,7): rotate = 180
-#     printWeatherMonitor(envUnit, rotate) 
 
 # ------------------------------------------------------------------------------     
 
@@ -891,6 +911,7 @@ else:
      print('Setting local time seconds diff from UTC:', secondsDiff) 
    except Exception as e:
      sys.print_exception(e)
+     saveError(e)
      nvs.write(ap.CONFIG, 0)
      printCenteredText("Fix config!", backgroundColor=lcd.RED, clear=True)
      time.sleep(2)
@@ -922,6 +943,7 @@ while wifi_password == None:
       if wifi_password != None: break
   except Exception as e:
       sys.print_exception(e)
+      saveError(e)
       printCenteredText("Wifi not found!", backgroundColor=lcd.RED, clear=True)  
   if wifi_password == None: time.sleep(1)
 
@@ -946,6 +968,7 @@ while now_datetime is None:
     startTime = utime.time()
   except Exception as e:
     sys.print_exception(e)
+    saveError(e)
     time.sleep(2)
 print("\nCurrent UTC datetime " +  str(now_datetime))
 
