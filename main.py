@@ -968,7 +968,7 @@ while now_datetime is None:
     startTime = utime.time()
   except Exception as e:
     sys.print_exception(e)
-    saveError(e)
+    #saveError(e)
     time.sleep(2)
 print("\nCurrent UTC datetime " +  str(now_datetime))
 
