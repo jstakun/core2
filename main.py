@@ -1,21 +1,20 @@
-from m5stack import *
+from m5stack import lcd, machine, binascii, gc, M5Screen, rtc, touch, btnA, btnB, btnC #
 import math
 import os
 import time
 import network
 import sys
-import deviceCfg
-import wifiCfg
-import machine
-import urequests
+import deviceCfg #
+import wifiCfg #
+import urequests #
 import _thread
 import utime
 import unit
 from collections import OrderedDict
-from imu import IMU
+from imu import IMU #
 import re
 import json
-import nvs
+import nvs #
 import ap
 
 EMERGENCY_PAUSE_INTERVAL = 1800  #sec = 30 mins
@@ -834,8 +833,9 @@ except Exception as e:
   #sys.print_exception(e)
 
 print('Starting ...')
-print('APIKEY:',deviceCfg.get_apikey())
+print('APIKEY:', deviceCfg.get_apikey())
 print('Board name:', deviceCfg.get_board_name())
+print('System:', sys.implementation)
 macaddr=wifiCfg.wlan_sta.config('mac')
 macaddr='{:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}'.format(*macaddr)
 print('MAC Adddress:', macaddr)
@@ -963,7 +963,7 @@ while now_datetime is None:
   try:
     print(".", end="")
     #TODO use 0.pool.ntp.org, 1.pool.ntp.org, 2.pool.ntp.org, 3.pool.ntp.org
-    rtc.settime('ntp', host=time_server, tzone=0) #UTC = GMT+0
+    rtc.settime('ntp', host=time_server, tzone=1) #UTC = GMT+0
     now_datetime = getRtcDatetime()
     startTime = utime.time()
   except Exception as e:
