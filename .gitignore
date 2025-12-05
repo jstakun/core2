@@ -4,4 +4,5 @@ lv.py
 hangman.py
 copyConfigJson.sh
 weather.py
+mainv2.py
 errors/*
