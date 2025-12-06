@@ -5,12 +5,13 @@ except:
 import network
 import esp
 esp.osdebug(None)
-import nvs
 import uos
+import ujson
 
 SSID = 'AP-M5DiabConf'
 PASSWORD = '123456789'
 CONFIG = 'config'
+CONFIG_FILE = 'config.json'
 
 ipconfig = None
 
@@ -94,21 +95,23 @@ def open_access_point(successCallback):
       entries = configParams.split('&') 
       wifi_ssid = None
       wifi_password = None
+      config = {}
       for entry in entries:
         [k,v] = entry.split('=')
-        #max nvs key length = 15
-        if len(k) > 15: k = k[0:15]
         value = unquote(v).decode()
         if k == 'ssid': wifi_ssid = value
         elif k == 'wifi_password': wifi_password = value  
         elif value.isdigit(): value = int(value) 
         if k != 'ssid' and k != 'wifi_password':
-          nvs.write(k, value)
+          config[k] = value
           print("Saved config parameter " + k)
-      if len(wifi_ssid) > 15: wifi_ssid = wifi_ssid[0:15]    
-      nvs.write(wifi_ssid, wifi_password)
+      config[wifi_ssid] = wifi_password
       print("Saved config parameter " + wifi_ssid)
-      nvs.write(CONFIG, 1)  
+      config[CONFIG] = 1
+      config["brightness"] = 32
+      with open(CONFIG_FILE, 'w') as confFile:
+        ujson.dump(config, confFile)   
+      
       successCallback()
       conn.send(successHtml)   
     else: 

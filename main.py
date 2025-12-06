@@ -14,13 +14,13 @@ from collections import OrderedDict
 from imu import IMU #
 import re
 import json
-import nvs #
 import ap
+import ujson
 
 EMERGENCY_PAUSE_INTERVAL = 1800  #sec = 30 mins
 MODES = ["full_elapsed", "full_date", "full_battery", "basic", "flip_full_elapsed", "flip_full_date", "flip_full_battery", "chart", "flip_chart"]
 SGVDICT_FILE = 'sgvdict.txt'
-RESPONSE_FILE = 'response.txt'
+RESPONSE_FILE = 'response.json'
 BACKEND_TIMEOUT_MS = 30000 #max 60000
 MAX_SAVED_ENTRIES = 10
 YEAR = 2025
@@ -72,32 +72,26 @@ def printTime(seconds, prefix='', suffix=''):
   h, m = divmod(m, 60)
   print(prefix + ' {:02d}:{:02d}:{:02d} '.format(h, m, s) + suffix)  
 
-def saveConfig(name, value):
-  configFile = open(name + ".conf", 'w')
-  configFile.write(str(value))
-  configFile.close()  
-  print('Saved config ' + name + ' value: ' + str(value))
-  
-def readConfig(name, defaultValue):
-  res = defaultValue
+def saveConfigFile():
+  global config
   try:
-    os.stat(name + ".conf")
-    configFile = open(name + ".conf", 'r')
-    res = configFile.read()        
-  except OSError:
-    print('Config file ' + name + '.conf not found')
-  print('Read config ' + name + ' value: ' + res)  
-  return res
+    with open(ap.CONFIG_FILE, 'w') as confFile:
+      ujson.dump(config, confFile) 
+    print("Successfully saved config file")
+  except Exception as e:
+    sys.print_exception(e) 
+    saveError(e)
  
 def saveResponseFile():
   global response
-  content = str(response).replace('\'','\"')
-  nvs.write(RESPONSE_FILE, content)
-
+  with open(RESPONSE_FILE, 'w') as responseFile:
+    ujson.dump(response, responseFile) 
+ 
 def readResponseFile():
   global response
   try:
-    response = json.loads(nvs.read_str(RESPONSE_FILE))
+    with open(RESPONSE_FILE, 'r') as responseFile:
+      response = ujson.loads(responseFile.read())
   except Exception as e:
     sys.print_exception(e)
     saveError(e)
@@ -108,12 +102,14 @@ def saveSgvFile(sgvdict):
   for key in sgvdict:
     items.append(str(key) + ':' + str(sgvdict[key]))
   content = '\n'.join(items)
-  nvs.write(SGVDICT_FILE, content)
+  with open(SGVDICT_FILE, 'w') as file:
+    file.write(content)
 
 def readSgvFile():
   d = OrderedDict()
   try: 
-    sgvFile = nvs.read_str(SGVDICT_FILE)
+    with open(SGVDICT_FILE, 'r') as f:
+      sgvFile = f.read()
     if sgvFile != None:
       entries = sgvFile.split('\n')
       for entry in entries:
@@ -771,17 +767,19 @@ def onBtnPressed():
     emergency = False
     emergencyPause = utime.time() + EMERGENCY_PAUSE_INTERVAL
   else:   
-    global brightness
+    global brightness, config
     brightness += 32
     if brightness > 128: brightness = 32
     screen = M5Screen()
     screen.set_screen_brightness(brightness)
-    saveConfig('brightness', brightness)
+    config["brightness"] = brightness
+    saveConfigFile()
 
 def onBtnBPressed():
-  global shuttingDown, mode
+  global shuttingDown, mode, config
   print('Button B pressed')
-  nvs.write(ap.CONFIG, 0)
+  config[ap.CONFIG] = 0
+  saveConfigFile()
   machine.WDT(timeout=1000)
   shuttingDown = True
   printCenteredText("Restarting...", mode, backgroundColor=lcd.RED, clear=True)  
@@ -791,11 +789,26 @@ def onBtnCPressed():
 
 # main app code -------------------------------------------------------------------     
 
-brightness = int(readConfig('brightness', "32"))
+config = None
+
+try:
+   os.stat(ap.CONFIG_FILE)
+   confFile = open(ap.CONFIG_FILE, 'r')
+   config = ujson.loads(confFile.read())
+except Exception as e:
+   sys.print_exception(e)
+
+mode = 0
+mpu = IMU()
+if mpu.acceleration[1] < 0: mode = 4 #flip
+
+brightness = 32
+if config != None: brightness = config["brightness"]
 screen = M5Screen()
 screen.set_screen_brightness(brightness)
 
 lcd.clear(lcd.DARKGREY)
+printCenteredText("Starting...", mode, backgroundColor=lcd.DARKGREY, clear=True)  
 
 envUnit = None
 try: 
@@ -834,10 +847,6 @@ emergencyPause = 0
 shuttingDown = False
 backendResponse = None
 beeperExecuted = False
-
-mode = 0
-mpu = IMU()
-if mpu.acceleration[1] < 0: mode = 4 #flip
   
 headerColor = None
 middleColor = None
@@ -852,8 +861,7 @@ prevTimeStr = None
 prevSgvStr = None
 batteryStrIndex = 0
 
-config = nvs.read_int(ap.CONFIG)
-if config == None or config == 0:
+if config == None or config[ap.CONFIG] == 0:
    printCenteredText("Connect AP ...", mode, backgroundColor=lcd.RED, clear=True)
    print("Connect wifi " + ap.SSID)
    def reboot():
@@ -865,19 +873,19 @@ if config == None or config == 0:
    ap.open_access_point(reboot)  
 else:
    try: 
-     API_ENDPOINT = nvs.read_str("api-endpoint")
-     API_TOKEN = nvs.read_str("api-token")
-     LOCALE = nvs.read_str("locale")
-     MIN = nvs.read_int("min")
-     MAX = nvs.read_int("max")
-     EMERGENCY_MIN = nvs.read_int("emergencyMin")
-     EMERGENCY_MAX = nvs.read_int("emergencyMax") 
-     TIMEZONE = "GMT" + nvs.read_str("timezone")
-     USE_BEEPER = nvs.read_int("beeper")
-     BEEPER_START_TIME = nvs.read_str("beeperStartTime")
-     BEEPER_END_TIME = nvs.read_str("beeperEndTime")
-     OLD_DATA = nvs.read_int("oldData")
-     OLD_DATA_EMERGENCY = nvs.read_int("oldDataEmergenc")
+     API_ENDPOINT = config["api-endpoint"]
+     API_TOKEN = config["api-token"]
+     LOCALE = config["locale"]
+     MIN = config["min"]
+     MAX = config["max"]
+     EMERGENCY_MIN = config["emergencyMin"]
+     EMERGENCY_MAX = config["emergencyMax"] 
+     TIMEZONE = "GMT" + config["timezone"]
+     USE_BEEPER = config["beeper"]
+     BEEPER_START_TIME = config["beeperStartTime"]
+     BEEPER_END_TIME = config["beeperEndTime"]
+     OLD_DATA = config["oldData"]
+     OLD_DATA_EMERGENCY = config["oldDataEmergenc"]
 
      if MIN < 30: MIN=30
      if MAX < 100: MAX=100
@@ -897,7 +905,8 @@ else:
    except Exception as e:
      sys.print_exception(e)
      saveError(e)
-     nvs.write(ap.CONFIG, 0)
+     config[ap.CONFIG] = 0
+     saveConfigFile()
      printCenteredText("Fix config!", mode, backgroundColor=lcd.RED, clear=True)
      time.sleep(2)
      machine.WDT(timeout=1000)
@@ -924,7 +933,10 @@ while wifi_password == None:
     nets = nic.scan()
     for result in nets:
       wifi_ssid = result[0].decode() 
-      wifi_password = nvs.read_str(wifi_ssid[0:15])
+      if wifi_ssid in config: 
+        wifi_password = config[wifi_ssid]
+      else:
+        print('No password for wifi ' + wifi_ssid + ' found')  
       if wifi_password != None: break
   except Exception as e:
       sys.print_exception(e)
