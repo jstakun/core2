@@ -1,19 +1,18 @@
-from m5stack import lcd, machine, binascii, gc, M5Screen, rtc, touch, btnA, btnB, btnC #
+from m5stack import lcd, machine, binascii, gc, M5Screen, rtc, touch, btnA, btnB, btnC 
 import math
 import os
 import time
 import network
 import sys
-import deviceCfg #
-import wifiCfg #
-import urequests #
+import deviceCfg 
+import wifiCfg 
+import urequests 
 import _thread
 import utime
 import unit
 from collections import OrderedDict
-from imu import IMU #
+from imu import IMU 
 import re
-import json
 import ap
 import ujson
 
