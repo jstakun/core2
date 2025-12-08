@@ -6,7 +6,6 @@ from hardware import WDT, I2C, Pin
 import machine
 import requests2
 import math
-import os
 import time
 import network
 import sys
@@ -34,6 +33,10 @@ BLUE = 0x0000FF
 ORANGE = 0xFFA500
 DARKGREY = 0x404040
 DARKGREEN = 0x006400
+LIGHTGREY = 0x666666
+
+SCREEN_WIDTH = 320
+SCREEN_HEIGHT = 240
 
 drawScreenLock = _thread.allocate_lock()
 
@@ -194,8 +197,8 @@ def printCenteredText(msg, mode, font=M5.Display.FONTS.DejaVu24, backgroundColor
     
   w = M5.Display.textWidth(msg)
   f = M5.Display.fontHeight()
-  x = math.ceil((320-w)/2)
-  y = math.ceil((240-f)/2)
+  x = math.ceil((SCREEN_WIDTH-w)/2)
+  y = math.ceil((SCREEN_HEIGHT-f)/2)
 
   M5.Display.drawString(msg, x, y)
 
@@ -214,38 +217,49 @@ def printText(msg, x, y, font=M5.Display.FONTS.DejaVu24, backgroundColor=BLACK, 
   if silent == False:
     print("Printing " + msg)
 
-def drawDirection(x, y, xshift=0, yshift=0, rotateAngle=0, arrowColor=WHITE, fillColor=WHITE):
-  M5.Lcd.fillCircle(x, y, 40, fillColor)
-  print("Printing Direction: " + str(x) + ',' + str(y))
-  drawTriangle(x+xshift, y+yshift, arrowColor, rotateAngle)
+def drawDirectionV2(cx, cy, radius=48, angle_degrees=0, gap=16, circle_color=WHITE, tri_color=WHITE, ydiff=0):
+    #cx - Center X coordinate
+    #cy - Center Y coordinate
+    #radius - Radius of the circle
+    #gap - Pixel gap
+    #circle_color 
+    #tri_color
+    #ydiff - triangle distance 
+    
+    # 1. Clear previous state
+    M5.Lcd.fillCircle(cx, cy, radius, circle_color)
 
-def drawDoubleDirection(x, y, ytop=0, ybottom=0, rotateAngle=0, arrowColor=WHITE, fillColor=WHITE):
-  M5.Lcd.fillCircle(x, y, 40, fillColor)
-  print("Printing DoubleDirection: " + str(x) + ',' + str(y))
-  drawTriangle(x, y+ytop, arrowColor, rotateAngle)
-  drawTriangle(x, y+ybottom, arrowColor, rotateAngle) 
-  
-def drawTriangle(centerX, centerY, arrowColor, rotateAngle=90, width=44, height=44):
-  angle = math.radians(rotateAngle) # Angle to rotate
+    r_tri = radius - gap
+    
+    # 2. Adjust the Angle
+    # We subtract 90 degrees so that Input 0 aligns with "Up" (270 deg / -90 deg on circle)
+    # We add the user input 'angle_degrees' to rotate clockwise from there.
+    adjusted_angle = angle_degrees - 90
+    rotation_rad = adjusted_angle * (math.pi / 180)
 
-  # Vertex's coordinates before rotating
-  x1 = centerX + width / 2
-  y1 = centerY
-  x2 = centerX - width / 2
-  y2 = centerY + height / 2
-  x3 = centerX - width / 2
-  y3 = centerY - height / 2
+    # 3. Calculate Vertices
+    
+    # Vertex 1: The "Pointer"
+    v1_angle = rotation_rad
+    x1 = cx + int(r_tri * math.cos(v1_angle))
+    y1 = cy + int(r_tri * math.sin(v1_angle))
 
-  # Rotating
-  x1r = ((x1 - centerX) * math.cos(angle) - (y1 - centerY) * math.sin(angle) + centerX)
-  y1r = ((x1 - centerX) * math.sin(angle) + (y1 - centerY) * math.cos(angle) + centerY)
-  x2r = ((x2 - centerX) * math.cos(angle) - (y2 - centerY) * math.sin(angle) + centerX)
-  y2r = ((x2 - centerX) * math.sin(angle) + (y2 - centerY) * math.cos(angle) + centerY)
-  x3r = ((x3 - centerX) * math.cos(angle) - (y3 - centerY) * math.sin(angle) + centerX)
-  y3r = ((x3 - centerX) * math.sin(angle) + (y3 - centerY) * math.cos(angle) + centerY)
+    # Vertex 2: +120 degrees from pointer
+    v2_angle = rotation_rad + (2 * math.pi / 3)
+    x2 = cx + int(r_tri * math.cos(v2_angle))
+    y2 = cy + int(r_tri * math.sin(v2_angle))
 
-  M5.Display.fillTriangle(int(x1r), int(y1r), int(x2r), int(y2r), int(x3r), int(y3r), arrowColor)
-  return x1r, y1r, x2r, y2r, x3r, y3r 
+    # Vertex 3: +240 degrees from pointer
+    v3_angle = rotation_rad + (4 * math.pi / 3)
+    x3 = cx + int(r_tri * math.cos(v3_angle))
+    y3 = cy + int(r_tri * math.sin(v3_angle))
+
+    # 4. Draw
+    if ydiff == 0:
+      M5.Lcd.fillTriangle(x1, y1, x2, y2, x3, y3, tri_color)
+    else:  
+      M5.Lcd.fillTriangle(x1, y1-ydiff, x2, y2-ydiff, x3, y3-ydiff, tri_color)
+      M5.Lcd.fillTriangle(x1, y1+ydiff, x2, y2+ydiff, x3, y3+ydiff, tri_color)
 
 def printLocaltime(mode, secondsDiff, localtime=None, useLock=False, silent=False):
   try: 
@@ -267,7 +281,7 @@ def printLocaltime(mode, secondsDiff, localtime=None, useLock=False, silent=Fals
       rotate = 1
       if mode >= 4:
         rotate = 3
-      printText(timeStr, 10, 12, backgroundColor=DARKGREY, silent=silent, rotate=rotate)  
+      printText(timeStr, 10, 10, backgroundColor=LIGHTGREY, silent=silent, rotate=rotate)  
       if useLock == False and locked == True:
         drawScreenLock.release()
   except Exception as e:
@@ -307,7 +321,7 @@ def drawScreen(newestEntry, noNetwork=False):
 
     emergencyNew = None
   
-    if tooOld: backgroundColor=DARKGREY; emergencyNew=False
+    if tooOld: backgroundColor=LIGHTGREY; emergencyNew=False
     elif sgv <= EMERGENCY_MIN: backgroundColor=RED; emergencyNew=(utime.time() > emergencyPause and not tooOld)  
     elif sgv >= (MIN-10) and sgv < MIN and directionStr.endswith("Up"): backgroundColor=DARKGREEN; emergencyNew=False
     elif sgv > EMERGENCY_MIN and sgv < MIN: backgroundColor=RED; emergencyNew=False
@@ -391,9 +405,9 @@ def drawScreen(newestEntry, noNetwork=False):
     
     M5.Display.setRotation(rotate)  
 
-    M5.Display.fillRect(0, 0, 360, 44, DARKGREY)
-    M5.Display.fillRect(0, 44, 360, 158, backgroundColor)
-    M5.Display.fillRect(0, 196, 360, 44, DARKGREY)
+    M5.Display.fillRect(0, 0, SCREEN_WIDTH, 44, LIGHTGREY)
+    M5.Display.fillRect(0, 44, SCREEN_WIDTH, 158, backgroundColor)
+    M5.Display.fillRect(0, SCREEN_HEIGHT-44, SCREEN_WIDTH, 44, LIGHTGREY)
 
     #draw current time
     printLocaltime(mode, secondsDiff, useLock=True)  
@@ -401,34 +415,35 @@ def drawScreen(newestEntry, noNetwork=False):
     #draw sgv
     M5.Display.setFont(M5.Display.FONTS.DejaVu72) 
     w = M5.Display.textWidth(sgvStr)
-    x = math.ceil((320 - w - 30 - 80) / 2)
-    y = 120 - 36
+    x = math.ceil((SCREEN_WIDTH - w - 30 - 80) / 2)
+    f = M5.Display.fontHeight()
+    y = math.ceil((SCREEN_HEIGHT - f) / 2)
     printText(sgvStr, x, y, font=M5.Display.FONTS.DejaVu72, backgroundColor=backgroundColor, rotate=rotate)
     
     #draw arrow
-    x += w + 70
-    y = 113
-    
-    if directionStr == 'DoubleUp': drawDoubleDirection(x, y, ytop=-12, ybottom=4, rotateAngle=-90, arrowColor=arrowColor)
-    elif directionStr == 'DoubleDown': drawDoubleDirection(x, y, ytop=-4, ybottom=12, rotateAngle=90, arrowColor=arrowColor) 
-    elif directionStr == 'SingleUp': drawDirection(x, y, xshift=0, yshift=-4, rotateAngle=-90, arrowColor=arrowColor)
-    elif directionStr == 'SingleDown': drawDirection(x, y, xshift=0, yshift=4, rotateAngle=90, arrowColor=arrowColor)
-    elif directionStr == 'Flat': drawDirection(x, y, xshift=4, rotateAngle=0, arrowColor=arrowColor)
-    elif directionStr == 'FortyFiveUp': drawDirection(x, y, xshift=4, yshift=-4, rotateAngle=-45, arrowColor=arrowColor)
-    elif directionStr == 'FortyFiveDown': drawDirection(x, y, xshift=4, yshift=4, rotateAngle=45, arrowColor=arrowColor)
-    
+    x += math.ceil(w) + 70
+    y = math.ceil(SCREEN_HEIGHT / 2)
+        
+    if directionStr == 'DoubleUp': drawDirectionV2(x, y, tri_color=arrowColor, ydiff=8)
+    elif directionStr == 'DoubleDown': drawDirectionV2(x, y, angle_degrees=180, tri_color=arrowColor, ydiff=8) 
+    elif directionStr == 'SingleUp': drawDirectionV2(x, y, tri_color=arrowColor)
+    elif directionStr == 'SingleDown': drawDirectionV2(x, y, angle_degrees=180, tri_color=arrowColor)
+    elif directionStr == 'Flat': drawDirectionV2(x, y, angle_degrees=90, tri_color=arrowColor)
+    elif directionStr == 'FortyFiveUp': drawDirectionV2(x, y, angle_degrees=45, tri_color=arrowColor)
+    elif directionStr == 'FortyFiveDown': drawDirectionV2(x, y, angle_degrees=135, tri_color=arrowColor)
+
     #draw battery
     M5.Display.setFont(M5.Display.FONTS.DejaVu24)
     textColor = batteryTextColor
     w = M5.Display.textWidth(batteryStr)
-    printText(batteryStr, math.ceil(315 - w), 12, font=M5.Display.FONTS.DejaVu24, backgroundColor=DARKGREY, textColor=textColor, rotate=rotate) 
+    printText(batteryStr, math.ceil(SCREEN_WIDTH - w - 10), 10, font=M5.Display.FONTS.DejaVu24, backgroundColor=LIGHTGREY, textColor=textColor, rotate=rotate) 
     
     #draw sgv diff
     textColor = WHITE
     if math.fabs(sgvDiff) >= 10 and backgroundColor != RED and not tooOld: textColor = RED
     w = M5.Display.textWidth(sgvDiffStr)
-    x = math.ceil(25 + (320 - w) / 2)
-    printText(sgvDiffStr, x, 12, font=M5.Display.FONTS.DejaVu24, backgroundColor=DARKGREY, textColor=textColor, rotate=rotate)
+    x = math.ceil(25 + (SCREEN_WIDTH - w) / 2)
+    printText(sgvDiffStr, x, 10, font=M5.Display.FONTS.DejaVu24, backgroundColor=LIGHTGREY, textColor=textColor, rotate=rotate)
     
     #draw dateStr
     M5.Display.setFont(M5.Display.FONTS.DejaVu24)
@@ -436,9 +451,9 @@ def drawScreen(newestEntry, noNetwork=False):
     if isOlderThan(sgvDateStr, 10, now): 
       textColor = RED
     w = M5.Display.textWidth(dateStr)
-    x = math.ceil((320 - w) / 2)
-    y = 240-24-5
-    printText(dateStr, x, y, font=M5.Display.FONTS.DejaVu24, backgroundColor=DARKGREY, textColor=textColor, rotate=rotate)  
+    x = math.ceil((SCREEN_WIDTH - w) / 2)
+    y = SCREEN_HEIGHT-24-10
+    printText(dateStr, x, y, font=M5.Display.FONTS.DejaVu24, backgroundColor=LIGHTGREY, textColor=textColor, rotate=rotate)  
     
     drawScreenLock.release()
     print("Printing screen finished in " + str((utime.time() - s)) + " secs ...")  
@@ -580,7 +595,7 @@ def watchdogCallback(t):
   print('Restarting due to backend communication failure ...')
   if rgbUnit != None:
     rgbUnit.set_color(0, BLACK)
-    rgbUnit.set_color(1, DARKGREY)
+    rgbUnit.set_color(1, LIGHTGREY)
     rgbUnit.set_color(2, BLACK)
   if backendResponse != None: backendResponse.close()
   WDT(timeout=1000)   
@@ -631,7 +646,7 @@ brightness = 32
 if config != None: brightness = config["brightness"]
 M5.Widgets.setBrightness(brightness)
 
-printCenteredText("Starting...", mode, backgroundColor=DARKGREY, clear=True)  
+printCenteredText("Starting...", mode, backgroundColor=LIGHTGREY, clear=True)  
 
 envUnit = None
 try: 
@@ -648,7 +663,7 @@ rgbUnit = None
 try: 
    rgbUnit = RGBUnit((36, 26), 3)
    rgbUnit.set_color(0, BLACK)     
-   rgbUnit.set_color(1, DARKGREY)
+   rgbUnit.set_color(1, LIGHTGREY)
    rgbUnit.set_color(2, BLACK)
 except Exception as e:
    print('RGB Unit not found')
@@ -733,7 +748,7 @@ try:
   nic = network.WLAN(network.STA_IF)
   nic.active(True)
 
-  printCenteredText("Scanning wifi ...", mode, backgroundColor=DARKGREY)
+  printCenteredText("Scanning wifi ...", mode, backgroundColor=LIGHTGREY)
 
   wifi_password = None
   wifi_ssid = None  
@@ -753,7 +768,7 @@ try:
       printCenteredText("Wifi not found!", mode, backgroundColor=RED, clear=True)  
     if wifi_password == None: time.sleep(1)
 
-  printCenteredText("Connecting wifi...", mode, backgroundColor=DARKGREY) 
+  printCenteredText("Connecting wifi...", mode, backgroundColor=LIGHTGREY) 
   nic.connect(wifi_ssid, wifi_password)
   print('Connecting wifi ' + wifi_ssid)
   while not nic.isconnected():
@@ -762,7 +777,7 @@ try:
   print("")  
 
   time_server = 'pool.ntp.org'
-  printCenteredText("Setting time...", mode, backgroundColor=DARKGREY) 
+  printCenteredText("Setting time...", mode, backgroundColor=LIGHTGREY) 
   print('Connecting time server ' + time_server)
   now_datetime = None
   while now_datetime is None:
@@ -779,7 +794,7 @@ try:
       time.sleep(2)
   print("\nCurrent UTC datetime " +  str(now_datetime))
 
-  printCenteredText("Loading data...", mode, backgroundColor=DARKGREY) 
+  printCenteredText("Loading data...", mode, backgroundColor=LIGHTGREY) 
 
   sgvDict = readSgvFile()
   dictLen = len(sgvDict)
