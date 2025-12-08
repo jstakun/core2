@@ -1,20 +1,22 @@
-from m5stack import lcd, machine, binascii, gc, M5Screen, rtc, touch, btnA, btnB, btnC 
+#UiFlow2 https://uiflow-micropython.readthedocs.io/en/develop/
+
+import M5
+import ntptime
+from hardware import WDT, I2C, Pin
+import machine
+import requests2
 import math
 import os
 import time
 import network
 import sys
-import deviceCfg 
-import wifiCfg 
-import urequests 
 import _thread
 import utime
-import unit
 from collections import OrderedDict
-from imu import IMU 
 import re
 import ap
 import ujson
+from unit import ENVUnit, RGBUnit
 
 EMERGENCY_PAUSE_INTERVAL = 1800  #sec = 30 mins
 MODES = ["full_elapsed", "full_date", "full_battery", "basic", "flip_full_elapsed", "flip_full_date", "flip_full_battery", "chart", "flip_chart"]
@@ -24,33 +26,19 @@ BACKEND_TIMEOUT_MS = 30000 #max 60000
 MAX_SAVED_ENTRIES = 10
 YEAR = 2025
 
+BLACK = 0x000000
+WHITE = 0xFFFFFF
+RED = 0xFF0000
+GREEN = 0x00FF00
+BLUE = 0x0000FF
+ORANGE = 0xFFA500
+DARKGREY = 0x404040
+DARKGREEN = 0x006400
+
 drawScreenLock = _thread.allocate_lock()
 
 def getBatteryLevel():
-  volt = power.getBatVoltage()
-  if volt < 3.20: return -1
-  if volt < 3.27: return 0
-  if volt < 3.61: return 5
-  if volt < 3.69: return 10
-  if volt < 3.71: return 15
-  if volt < 3.73: return 20
-  if volt < 3.75: return 25
-  if volt < 3.77: return 30
-  if volt < 3.79: return 35
-  if volt < 3.80: return 40
-  if volt < 3.82: return 45
-  if volt < 3.84: return 50
-  if volt < 3.85: return 55
-  if volt < 3.87: return 60
-  if volt < 3.91: return 65
-  if volt < 3.95: return 70
-  if volt < 3.98: return 75
-  if volt < 4.02: return 80
-  if volt < 4.08: return 85
-  if volt < 4.11: return 90
-  if volt < 4.15: return 95
-  if volt < 4.20: return 100
-  if volt >= 4.20: return 101
+  return M5.Power.getBatteryLevel() 
 
 def isOlderThan(date_str, mins, now_seconds, print_time=False): 
   the_date = getDateTuple(date_str)
@@ -146,18 +134,17 @@ def persistEntries():
 
   sgvDict = d
   saveSgvFile(d)
-  gc.collect()  
-  print('Persisted ' + str(dictLen) + " sgv entries")
+  print('\nPersisted ' + str(dictLen) + " sgv entries")
 
 def checkBeeper():
-  global USE_BEEPER, BEEPER_START_TIME, BEEPER_END_TIME, secondsDiff 
+  global USE_BEEPER, BEEPER_START_TIME, BEEPER_END_TIME, secondsDiff
   try:   
     if (USE_BEEPER == 1 and getBatteryLevel() >= 5):
       d = utime.localtime(0)
-      now_datetime = rtc.datetime() 
+      now_datetime = utime.localtime(utime.time()) 
       if now_datetime[0] < YEAR:
         raise ValueError('Invalid datetime: ' + str(now_datetime))
-      now = utime.mktime((now_datetime[0], now_datetime[1], now_datetime[2], now_datetime[4], now_datetime[5], now_datetime[6],0,0))
+      now = utime.mktime((now_datetime[0], now_datetime[1], now_datetime[2], now_datetime[3], now_datetime[4], now_datetime[5],0,0))
       localtime = utime.localtime(now + secondsDiff)
       
       c = list(d)
@@ -195,70 +182,58 @@ def checkBeeper():
 def getRtcDatetime():
   now_datetime = None
   for i in range(3):
-    now_datetime = rtc.datetime()
+    now_datetime = utime.localtime(utime.time())
     if now_datetime[0] >= YEAR:
       return now_datetime
   raise ValueError('Invalid datetime: ' + str(now_datetime))
 
 # gui methods ----
 
-def printCenteredText(msg, mode, font=lcd.FONT_DejaVu24, backgroundColor=lcd.BLACK, textColor=lcd.WHITE, clear=False):
-  rotate = 0
-  if mode >= 4: 
-    rotate = 180
-  lcd.font(font, rotate=rotate)
-  if clear == True:
-    lcd.clear(backgroundColor)
-  lcd.setTextColor(textColor)
-  w = lcd.textWidth(msg)
-  f = lcd.fontSize()
+def printCenteredText(msg, mode, font=M5.Display.FONTS.DejaVu24, backgroundColor=BLACK, textColor=WHITE, clear=True):  
+  if mode >= 4:
+    M5.Display.setRotation(3)
+  else:        
+    M5.Display.setRotation(1)
+    
+  if clear:
+    M5.Display.clear(backgroundColor)
+        
+  M5.Display.setFont(font)
+    
+  M5.Display.setTextColor(textColor, backgroundColor)
+    
+  w = M5.Display.textWidth(msg)
+  f = M5.Display.fontHeight()
   x = math.ceil((320-w)/2)
-  y = math.ceil((240-f[1])/2)
-  if rotate == 180:
-    x = math.ceil(160+(w/2))
-    y = math.ceil(120+(f[1]/2))
-  lcd.fillRect(0, math.ceil(120-f[1]/2), 320, math.ceil(f[1]), backgroundColor)
-  lcd.print(msg, x, y)
+  y = math.ceil((240-f)/2)
 
-def printText(msg, x, y, cleanupMsg, font=lcd.FONT_DejaVu24, backgroundColor=lcd.BLACK, textColor=lcd.WHITE, clear=True, rotate=0, cleanupX=None, silent=False):
-  lcd.font(font, rotate=rotate)
-  if clear == True and cleanupMsg != None:
-     if cleanupX == None: cleanupX = x
-     w = lcd.textWidth(cleanupMsg)
-     f = lcd.fontSize()
-     if silent == False: 
-       print("Clearing " + cleanupMsg + ": " + str(cleanupX) + "," + str(y))
-     if rotate == 0:
-       lcd.fillRect(cleanupX, math.ceil(y), math.ceil(w)+2, math.ceil(f[1]), backgroundColor)
-     else:   
-       lcd.fillRect(math.ceil(cleanupX-w), math.ceil(y-f[1]), math.ceil(w)+2, math.ceil(f[1]), backgroundColor)
-  lcd.setTextColor(textColor)
-  lcd.print(msg, x, y)
+  M5.Display.drawString(msg, x, y)
+
+def printText(msg, x, y, font=M5.Display.FONTS.DejaVu24, backgroundColor=BLACK, textColor=WHITE, clear=False, rotate=1, silent=False):
+  M5.Display.setRotation(rotate)  
+    
+  if clear:
+    M5.Display.clear(backgroundColor)
+        
+  M5.Display.setFont(font)
+    
+  M5.Display.setTextColor(textColor, backgroundColor)
+    
+  M5.Display.drawString(msg, x, y)
+  
   if silent == False:
     print("Printing " + msg)
 
-def drawDirection(x, y, directionStr, prevX, prevY, prevDirectionStr, xshift=0, yshift=0, rotateAngle=0, arrowColor=lcd.WHITE, fillColor=lcd.WHITE, backgroundColor=lcd.BLACK):
-  cleared = False
-  if prevX != None and prevY != None and (prevX != x or prevY != y):
-    print('Clearing: ' + str(prevX) + "," + str(prevY))
-    lcd.circle(prevX, prevY, 40, fillcolor=backgroundColor, color=backgroundColor) 
-    cleared = True 
-  if cleared == True or directionStr != prevDirectionStr:
-    lcd.circle(x, y, 40, fillcolor=fillColor, color=fillColor)
-    print("Printing Direction: " + str(x) + ',' + str(y))
-    drawTriangle(x+xshift, y+yshift, arrowColor, rotateAngle)
+def drawDirection(x, y, xshift=0, yshift=0, rotateAngle=0, arrowColor=WHITE, fillColor=WHITE):
+  M5.Lcd.fillCircle(x, y, 40, fillColor)
+  print("Printing Direction: " + str(x) + ',' + str(y))
+  drawTriangle(x+xshift, y+yshift, arrowColor, rotateAngle)
 
-def drawDoubleDirection(x, y, directionStr, prevX, prevY, prevDirectionStr, ytop=0, ybottom=0, rotateAngle=0, arrowColor=lcd.WHITE, fillColor=lcd.WHITE, backgroundColor=lcd.BLACK):
-  cleared = False
-  if prevX != None and prevY != None and (prevX != x or prevY != y):
-    print('Clearing: ' + str(prevX) + "," + str(prevY))
-    lcd.circle(prevX, prevY, 40, fillcolor=backgroundColor, color=backgroundColor)
-    cleared = True  
-  if cleared == True or directionStr != prevDirectionStr:
-    lcd.circle(x, y, 40, fillcolor=fillColor, color=fillColor)
-    print("Printing DoubleDirection: " + str(x) + ',' + str(y))
-    drawTriangle(x, y+ytop, arrowColor, rotateAngle)
-    drawTriangle(x, y+ybottom, arrowColor, rotateAngle) 
+def drawDoubleDirection(x, y, ytop=0, ybottom=0, rotateAngle=0, arrowColor=WHITE, fillColor=WHITE):
+  M5.Lcd.fillCircle(x, y, 40, fillColor)
+  print("Printing DoubleDirection: " + str(x) + ',' + str(y))
+  drawTriangle(x, y+ytop, arrowColor, rotateAngle)
+  drawTriangle(x, y+ybottom, arrowColor, rotateAngle) 
   
 def drawTriangle(centerX, centerY, arrowColor, rotateAngle=90, width=44, height=44):
   angle = math.radians(rotateAngle) # Angle to rotate
@@ -279,15 +254,14 @@ def drawTriangle(centerX, centerY, arrowColor, rotateAngle=90, width=44, height=
   x3r = ((x3 - centerX) * math.cos(angle) - (y3 - centerY) * math.sin(angle) + centerX)
   y3r = ((x3 - centerX) * math.sin(angle) + (y3 - centerY) * math.cos(angle) + centerY)
 
-  lcd.fillTriangle(int(x1r), int(y1r), int(x2r), int(y2r), int(x3r), int(y3r), arrowColor)
-  #lcd.triangle(int(x1r), int(y1r), int(x2r), int(y2r), int(x3r), int(y3r), fillcolor=arrowColor, color=arrowColor)
+  M5.Display.fillTriangle(int(x1r), int(y1r), int(x2r), int(y2r), int(x3r), int(y3r), arrowColor)
   return x1r, y1r, x2r, y2r, x3r, y3r 
 
-def printLocaltime(prevTimeStr, mode, secondsDiff, localtime=None, useLock=False, silent=False):
+def printLocaltime(mode, secondsDiff, localtime=None, useLock=False, silent=False):
   try: 
     if localtime == None:
       now_datetime = getRtcDatetime()
-      now = utime.mktime((now_datetime[0], now_datetime[1], now_datetime[2], now_datetime[4], now_datetime[5], now_datetime[6],0,0))  + secondsDiff
+      now = utime.mktime((now_datetime[0], now_datetime[1], now_datetime[2], now_datetime[3], now_datetime[4], now_datetime[5],0,0))  + secondsDiff
       localtime = utime.localtime(now)
     h = str(localtime[3])
     if (localtime[3] < 10): h = "0" + h   
@@ -296,25 +270,22 @@ def printLocaltime(prevTimeStr, mode, secondsDiff, localtime=None, useLock=False
     s = str(localtime[5])
     if (localtime[5] < 10): s = "0" + s
     timeStr = h + ":" + m + ":" + s
-    if timeStr != prevTimeStr:
-      locked = False 
-      if useLock == False and drawScreenLock.locked() == False:
-        locked = drawScreenLock.acquire()
-      if locked == True or useLock == True:
-        if mode in range (0,3):
-          printText(timeStr, 10, 12, prevTimeStr, font=lcd.FONT_DejaVu24, backgroundColor=lcd.DARKGREY, silent=silent)  
-        elif mode in range (4,7):
-          printText(timeStr, 304, 215, prevTimeStr, font=lcd.FONT_DejaVu24, backgroundColor=lcd.DARKGREY, rotate=180, silent=silent)   
-        if useLock == False and locked == True:
-          drawScreenLock.release()
-    return timeStr       
+    locked = False 
+    if useLock == False and drawScreenLock.locked() == False:
+      locked = drawScreenLock.acquire()
+    if locked == True or useLock == True:
+      rotate = 1
+      if mode >= 4:
+        rotate = 3
+      printText(timeStr, 10, 12, backgroundColor=DARKGREY, silent=silent, rotate=rotate)  
+      if useLock == False and locked == True:
+        drawScreenLock.release()
   except Exception as e:
     sys.print_exception(e)
     saveError(e)
-    return None
 
-def drawScreen(newestEntry, clear=False, noNetwork=False):
-  global response, mode, brightness, emergency, emergencyPause, MIN, MAX, EMERGENCY_MIN, EMERGENCY_MAX, startTime, rgbUnit, secondsDiff, OLD_DATA, OLD_DATA_EMERGENCY, headerColor, middleColor, footerColor, prevDateStr, prevSgvDiffStr, prevBatteryStr, prevTimeStr, prevSgvStr, prevX, prevY, prevDirectionStr, batteryStrIndex, envUnit, secondsDiff 
+def drawScreen(newestEntry, noNetwork=False):
+  global response, mode, brightness, emergency, emergencyPause, MIN, MAX, EMERGENCY_MIN, EMERGENCY_MAX, startTime, rgbUnit, secondsDiff, OLD_DATA, OLD_DATA_EMERGENCY, batteryStrIndex, envUnit, secondsDiff 
   #320*240
   
   now_datetime = getRtcDatetime()
@@ -334,9 +305,8 @@ def drawScreen(newestEntry, clear=False, noNetwork=False):
     directionStr = newestEntry['direction']
     sgvDateStr = newestEntry['date']
   
-    now = utime.mktime((now_datetime[0], now_datetime[1], now_datetime[2], now_datetime[4], now_datetime[5], now_datetime[6],0,0))  + secondsDiff
-    #localtime = utime.localtime(now)
-  
+    now = utime.mktime((now_datetime[0], now_datetime[1], now_datetime[2], now_datetime[3], now_datetime[4], now_datetime[5],0,0))  + secondsDiff
+    
     tooOld = False
     try:
       tooOld = isOlderThan(sgvDateStr, OLD_DATA, now, print_time=True)
@@ -347,19 +317,19 @@ def drawScreen(newestEntry, clear=False, noNetwork=False):
 
     emergencyNew = None
   
-    if tooOld: backgroundColor=lcd.DARKGREY; emergencyNew=False
-    elif sgv <= EMERGENCY_MIN: backgroundColor=lcd.RED; emergencyNew=(utime.time() > emergencyPause and not tooOld)  
-    elif sgv >= (MIN-10) and sgv < MIN and directionStr.endswith("Up"): backgroundColor=lcd.DARKGREEN; emergencyNew=False
-    elif sgv > EMERGENCY_MIN and sgv < MIN: backgroundColor=lcd.RED; emergencyNew=False
-    elif sgv >= MIN and sgv <= MAX: backgroundColor=lcd.DARKGREEN; emergencyNew=False 
-    elif sgv > MAX and sgv <= (MAX+10) and directionStr.endswith("Down"): backgroundColor=lcd.DARKGREEN; emergencyNew=False
-    elif sgv > MAX and sgv <= EMERGENCY_MAX: backgroundColor=lcd.ORANGE; emergencyNew=False
-    elif sgv > EMERGENCY_MAX: backgroundColor=lcd.ORANGE; emergencyNew=(utime.time() > emergencyPause and not tooOld)  
+    if tooOld: backgroundColor=DARKGREY; emergencyNew=False
+    elif sgv <= EMERGENCY_MIN: backgroundColor=RED; emergencyNew=(utime.time() > emergencyPause and not tooOld)  
+    elif sgv >= (MIN-10) and sgv < MIN and directionStr.endswith("Up"): backgroundColor=DARKGREEN; emergencyNew=False
+    elif sgv > EMERGENCY_MIN and sgv < MIN: backgroundColor=RED; emergencyNew=False
+    elif sgv >= MIN and sgv <= MAX: backgroundColor=DARKGREEN; emergencyNew=False 
+    elif sgv > MAX and sgv <= (MAX+10) and directionStr.endswith("Down"): backgroundColor=DARKGREEN; emergencyNew=False
+    elif sgv > MAX and sgv <= EMERGENCY_MAX: backgroundColor=ORANGE; emergencyNew=False
+    elif sgv > EMERGENCY_MAX: backgroundColor=ORANGE; emergencyNew=(utime.time() > emergencyPause and not tooOld)  
   
     #battery level emergency
     batteryLevel = getBatteryLevel()
     uptime = utime.time() - startTime  
-    if (batteryLevel < 10 and batteryLevel > 0 and uptime > 300) and (utime.time() > emergencyPause) and not power.getChargeState(): 
+    if (batteryLevel < 10 and batteryLevel > 0 and uptime > 300) and (utime.time() > emergencyPause) and not M5.Power.isCharging(): 
       emergencyNew = True
       if currentMode < 4 or currentMode == 7: currentMode = 2
       else: currentMode = 6
@@ -373,9 +343,9 @@ def drawScreen(newestEntry, clear=False, noNetwork=False):
     emergency = emergencyNew  
 
     if emergency == False and rgbUnit != None:
-      rgbUnit.setColor(1, lcd.BLACK)
-      rgbUnit.setColor(2, backgroundColor)
-      rgbUnit.setColor(3, lcd.BLACK)
+      rgbUnit.set_color(0, BLACK)
+      rgbUnit.set_color(1, backgroundColor)
+      rgbUnit.set_color(2, BLACK)
 
     #if emergency change to one of full modes 
     if emergency == True and (currentMode == 3 or currentMode == 7): currentMode = 0
@@ -390,29 +360,29 @@ def drawScreen(newestEntry, clear=False, noNetwork=False):
     else:   
       dateStr = sgvDateStr.replace("T", " ")[:-3] #remove seconds
   
-    if not tooOld and directionStr == 'DoubleUp' and sgv+20>=MAX and sgv<MAX: arrowColor = lcd.ORANGE
-    elif not tooOld and directionStr == 'DoubleUp' and sgv>=MAX: arrowColor = lcd.RED
-    elif not tooOld and directionStr == 'DoubleDown' and sgv-20<=MIN: arrowColor = lcd.RED
-    elif not tooOld and directionStr.endswith('Up') and sgv+10>=MAX and sgv<MAX: arrowColor = lcd.ORANGE
-    elif not tooOld and directionStr.endswith('Down') and sgv-10<=MIN: arrowColor = lcd.RED
+    if not tooOld and directionStr == 'DoubleUp' and sgv+20>=MAX and sgv<MAX: arrowColor = ORANGE
+    elif not tooOld and directionStr == 'DoubleUp' and sgv>=MAX: arrowColor = RED
+    elif not tooOld and directionStr == 'DoubleDown' and sgv-20<=MIN: arrowColor = RED
+    elif not tooOld and directionStr.endswith('Up') and sgv+10>=MAX and sgv<MAX: arrowColor = ORANGE
+    elif not tooOld and directionStr.endswith('Down') and sgv-10<=MIN: arrowColor = RED
     else: arrowColor = backgroundColor  
 
     batteryStr = str(batteryLevel) + '%'
-    batteryTextColor = lcd.WHITE
-    if batteryLevel < 20: batteryTextColor = lcd.RED
+    batteryTextColor = WHITE
+    if batteryLevel < 20: batteryTextColor = RED
     try:
       if envUnit != None and batteryLevel > 20:
         if batteryStrIndex == 1: 
-          batteryStr = "%.0fC" % envUnit.temperature
-          if envUnit.temperature > 25 or envUnit.temperature < 18: batteryTextColor = lcd.RED
+          batteryStr = "%.0fC" % envUnit.read_temperature()
+          if envUnit.read_temperature() > 25 or envUnit.read_temperature() < 18: batteryTextColor = RED
           batteryStrIndex = 2
         elif batteryStrIndex == 2:
-          batteryStr = 'p'+ "%.0f" % envUnit.pressure
-          if envUnit.pressure > 1050 or envUnit.pressure < 950: batteryTextColor = lcd.RED
+          batteryStr = 'p'+ "%.0f" % envUnit.read_pressure()
+          if envUnit.read_pressure() > 1050 or envUnit.read_pressure() < 950: batteryTextColor = RED
           batteryStrIndex = 3
         elif batteryStrIndex == 3:
-          batteryStr = 'h' + "%.0f" % envUnit.humidity + '%'
-          if envUnit.humidity < 40 or envUnit.humidity > 60: batteryTextColor = lcd.RED
+          batteryStr = 'h' + "%.0f" % envUnit.read_humidity() + '%'
+          if envUnit.read_humidity() < 40 or envUnit.read_humidity() > 60: batteryTextColor = RED
           batteryStrIndex = 0  
         else:
           batteryStrIndex = 1  
@@ -420,192 +390,68 @@ def drawScreen(newestEntry, clear=False, noNetwork=False):
       sys.print_exception(e)
       #saveError(e)
 
-
     sgvDiff = 0
     if len(response) > 1: sgvDiff = sgv - response[1]['sgv']
     sgvDiffStr = str(sgvDiff)
     if sgvDiff > 0: sgvDiffStr = "+" + sgvDiffStr
-   
-    if clear:
-      headerColor = None
-      middleColor = None
-      footerColor = None
-      prevX = None
-      prevY = None
-      prevDirectionStr = None
-      prevDateStr = None 
-      prevSgvDiffStr = None
-      prevBatteryStr = None 
-      prevTimeStr = None 
-      prevSgvStr = None
+     
+    rotate = 1
+    if mode >= 4:
+      rotate = 3
     
-    if headerColor != lcd.DARKGREY:
-      headerColor = lcd.DARKGREY
-      lcd.fillRect(0, 0, 360, 50, lcd.DARKGREY)
+    M5.Display.setRotation(rotate)  
 
-    if backgroundColor != middleColor:
-      middleColor = backgroundColor 
-      lcd.fillRect(0, 48, 360, 140, backgroundColor)
-      prevDirectionStr = None
-      prevSgvStr = None
-    
-    if footerColor != lcd.DARKGREY:
-      footerColor = lcd.DARKGREY     
-      lcd.fillRect(0, 192, 360, 50, lcd.DARKGREY)
+    M5.Display.fillRect(0, 0, 360, 44, DARKGREY)
+    M5.Display.fillRect(0, 44, 360, 158, backgroundColor)
+    M5.Display.fillRect(0, 196, 360, 44, DARKGREY)
 
-    if currentMode in range (0,3):
-
-      #draw current time
-      prevTimeStr = printLocaltime(prevTimeStr, mode, secondsDiff, useLock=True)  
+    #draw current time
+    printLocaltime(mode, secondsDiff, useLock=True)  
  
-      #draw sgv 
-      lcd.font(lcd.FONT_DejaVu72)
-      w = lcd.textWidth(sgvStr)
-      x = math.ceil((320 - w - 20 - 80) / 2)
-      y = 120 - 36
-      if sgvStr != prevSgvStr:
-        if prevSgvStr != None: 
-          cleanupX = math.ceil((320 - lcd.textWidth(prevSgvStr) - 20 - 80) / 2)
-        else:
-          cleanupX = None 
-        printText(sgvStr, x, y, prevSgvStr, font=lcd.FONT_DejaVu72, backgroundColor=backgroundColor, cleanupX=cleanupX)
-        prevSgvStr = sgvStr
-
-      #draw arrow
-      x += w + 60
-      y = 113
+    #draw sgv
+    M5.Display.setFont(M5.Display.FONTS.DejaVu72) 
+    w = M5.Display.textWidth(sgvStr)
+    x = math.ceil((320 - w - 30 - 80) / 2)
+    y = 120 - 36
+    printText(sgvStr, x, y, font=M5.Display.FONTS.DejaVu72, backgroundColor=backgroundColor, rotate=rotate)
     
-      if directionStr == 'DoubleUp': drawDoubleDirection(x, y, directionStr, ytop=-12, ybottom=4, rotateAngle=-90, arrowColor=arrowColor, backgroundColor=backgroundColor)
-      elif directionStr == 'DoubleDown': drawDoubleDirection(x, y, directionStr, ytop=-4, ybottom=12, rotateAngle=90, arrowColor=arrowColor, backgroundColor=backgroundColor) 
-      elif directionStr == 'SingleUp': drawDirection(x, y, directionStr, prevX, prevY, prevDirectionStr, xshift=0, yshift=-4, rotateAngle=-90, arrowColor=arrowColor, backgroundColor=backgroundColor)
-      elif directionStr == 'SingleDown': drawDirection(x, y, directionStr, prevX, prevY, prevDirectionStr, xshift=0, yshift=4, rotateAngle=90, arrowColor=arrowColor, backgroundColor=backgroundColor)
-      elif directionStr == 'Flat': drawDirection(x, y, directionStr, prevX, prevY, prevDirectionStr, xshift=4, rotateAngle=0, arrowColor=arrowColor, backgroundColor=backgroundColor)
-      elif directionStr == 'FortyFiveUp': drawDirection(x, y, directionStr, prevX, prevY, prevDirectionStr, xshift=4, yshift=-4, rotateAngle=-45, arrowColor=arrowColor, backgroundColor=backgroundColor)
-      elif directionStr == 'FortyFiveDown': drawDirection(x, y, directionStr, prevX, prevY, prevDirectionStr, xshift=4, yshift=4, rotateAngle=45, arrowColor=arrowColor, backgroundColor=backgroundColor)
-
-      prevX = x, 
-      prevY = y, 
-      prevDirectionStr = directionStr
-      
-      #draw battery
-      lcd.font(lcd.FONT_DejaVu24)
-      if batteryStr != prevBatteryStr:
-        textColor = batteryTextColor
-        w = lcd.textWidth(batteryStr)
-        if prevBatteryStr != None: 
-          cleanupX = math.ceil(315 - lcd.textWidth(prevBatteryStr))
-        else:
-          cleanupX = None 
-        printText(batteryStr, math.ceil(315 - w), 12, prevBatteryStr, font=lcd.FONT_DejaVu24, backgroundColor=lcd.DARKGREY, textColor=textColor, cleanupX=cleanupX) 
-        prevBatteryStr = batteryStr 
-
-      #draw sgv diff
-      if prevSgvDiffStr != sgvDiffStr:
-        textColor = lcd.WHITE
-        if math.fabs(sgvDiff) >= 10 and backgroundColor != lcd.RED and not tooOld: textColor = lcd.RED
-        w = lcd.textWidth(sgvDiffStr)
-        if prevSgvDiffStr != None: 
-          cleanupX = math.ceil(30 + (320 - lcd.textWidth(prevSgvDiffStr)) / 2)
-        else:
-          cleanupX = None 
-        x = math.ceil(30 + (320 - w) / 2)
-        printText(sgvDiffStr, x, 12, prevSgvDiffStr, font=lcd.FONT_DejaVu24, backgroundColor=lcd.DARKGREY, textColor=textColor, cleanupX=cleanupX)
-        prevSgvDiffStr = sgvDiffStr
+    #draw arrow
+    x += w + 70
+    y = 113
     
-      #draw dateStr
-      if dateStr != prevDateStr:
-        lcd.font(lcd.FONT_DejaVu24)
-        textColor = lcd.WHITE
-        if isOlderThan(sgvDateStr, 10, now): 
-          textColor = lcd.RED
-        w = lcd.textWidth(dateStr)
-        x = math.ceil((320 - w) / 2)
-        y = 240-24-5
-        if prevDateStr != None: 
-          cleanupX = math.ceil((320 - lcd.textWidth(prevDateStr)) / 2)  
-        else:
-          cleanupX = None  
-        printText(dateStr, x, y, prevDateStr, font=lcd.FONT_DejaVu24, backgroundColor=lcd.DARKGREY, textColor=textColor, cleanupX=cleanupX)  
-        prevDateStr = dateStr
-
-    elif currentMode in range(4,7):
-      #flip mode
+    if directionStr == 'DoubleUp': drawDoubleDirection(x, y, ytop=-12, ybottom=4, rotateAngle=-90, arrowColor=arrowColor)
+    elif directionStr == 'DoubleDown': drawDoubleDirection(x, y, ytop=-4, ybottom=12, rotateAngle=90, arrowColor=arrowColor) 
+    elif directionStr == 'SingleUp': drawDirection(x, y, xshift=0, yshift=-4, rotateAngle=-90, arrowColor=arrowColor)
+    elif directionStr == 'SingleDown': drawDirection(x, y, xshift=0, yshift=4, rotateAngle=90, arrowColor=arrowColor)
+    elif directionStr == 'Flat': drawDirection(x, y, xshift=4, rotateAngle=0, arrowColor=arrowColor)
+    elif directionStr == 'FortyFiveUp': drawDirection(x, y, xshift=4, yshift=-4, rotateAngle=-45, arrowColor=arrowColor)
+    elif directionStr == 'FortyFiveDown': drawDirection(x, y, xshift=4, yshift=4, rotateAngle=45, arrowColor=arrowColor)
     
-      #draw current time
-      prevTimeStr = printLocaltime(prevTimeStr, mode, secondsDiff, useLock=True)
-
-      #draw sgv 
-      lcd.font(lcd.FONT_DejaVu72)
-      w = lcd.textWidth(sgvStr)
-      x = math.ceil(320 - (320 - w - 20 - 80) / 2)
-      if x > 275: x = 275 #fix to bug in micropyhton
-      y = 148
-      if sgvStr != prevSgvStr:
-        if prevSgvStr != None: 
-          cleanupX = math.ceil(320 - (320 - lcd.textWidth(prevSgvStr) - 20 - 80) / 2)  
-        else:
-          cleanupX = None  
-        printText(sgvStr, x, y, prevSgvStr, font=lcd.FONT_DejaVu72, backgroundColor=backgroundColor, rotate=180, cleanupX=cleanupX)
-        prevSgvStr = sgvStr
+    #draw battery
+    M5.Display.setFont(M5.Display.FONTS.DejaVu24)
+    textColor = batteryTextColor
+    w = M5.Display.textWidth(batteryStr)
+    printText(batteryStr, math.ceil(315 - w), 12, font=M5.Display.FONTS.DejaVu24, backgroundColor=DARKGREY, textColor=textColor, rotate=rotate) 
     
-      #draw arrow
-      x -= (60 + w)
-      y -= 30
+    #draw sgv diff
+    textColor = WHITE
+    if math.fabs(sgvDiff) >= 10 and backgroundColor != RED and not tooOld: textColor = RED
+    w = M5.Display.textWidth(sgvDiffStr)
+    x = math.ceil(25 + (320 - w) / 2)
+    printText(sgvDiffStr, x, 12, font=M5.Display.FONTS.DejaVu24, backgroundColor=DARKGREY, textColor=textColor, rotate=rotate)
     
-      if directionStr == 'DoubleUp': drawDoubleDirection(x, y, directionStr, prevX, prevY, prevDirectionStr, ytop=-4, ybottom=12, rotateAngle=90, arrowColor=arrowColor, backgroundColor=backgroundColor)
-      elif directionStr == 'DoubleDown': drawDoubleDirection(x, y, directionStr, prevX, prevY, prevDirectionStr, ytop=-12, ybottom=4, rotateAngle=-90, arrowColor=arrowColor, backgroundColor=backgroundColor) 
-      elif directionStr == 'SingleUp': drawDirection(x, y, directionStr, prevX, prevY, prevDirectionStr, xshift=0, yshift=4, rotateAngle=90, arrowColor=arrowColor, backgroundColor=backgroundColor)
-      elif directionStr == 'SingleDown': drawDirection(x, y, directionStr, prevX, prevY, prevDirectionStr, xshift=0, yshift=-4, rotateAngle=-90, arrowColor=arrowColor, backgroundColor=backgroundColor)
-      elif directionStr == 'Flat': drawDirection(x, y, directionStr, prevX, prevY, prevDirectionStr, xshift=-4, rotateAngle=180, arrowColor=arrowColor, backgroundColor=backgroundColor)
-      elif directionStr == 'FortyFiveUp': drawDirection(x, y, directionStr, prevX, prevY, prevDirectionStr, xshift=-4, yshift=4, rotateAngle=135, arrowColor=arrowColor, backgroundColor=backgroundColor)
-      elif directionStr == 'FortyFiveDown': drawDirection(x, y, directionStr, prevX, prevY, prevDirectionStr, xshift=-4, yshift=-4, rotateAngle=-135, arrowColor=arrowColor, backgroundColor=backgroundColor)
-  
-      prevX = x 
-      prevY = y 
-      prevDirectionStr = directionStr 
-
-      #draw battery
-      lcd.font(lcd.FONT_DejaVu24)
-      if batteryStr != prevBatteryStr:
-        textColor = batteryTextColor
-        w = lcd.textWidth(batteryStr)
-        if prevBatteryStr != None: 
-          cleanupX = math.ceil(lcd.textWidth(prevBatteryStr)+5)
-        else:
-          cleanupX = None 
-        printText(batteryStr, math.ceil(w+5), 215, prevBatteryStr, font=lcd.FONT_DejaVu24, backgroundColor=lcd.DARKGREY, rotate=180, textColor=textColor, cleanupX=cleanupX) 
-        prevBatteryStr = batteryStr
-
-      #draw sgv diff
-      if prevSgvDiffStr != sgvDiffStr:
-        textColor = lcd.WHITE
-        if math.fabs(sgvDiff) >= 10 and backgroundColor != lcd.RED and not tooOld: textColor = lcd.RED
-        w = lcd.textWidth(sgvDiffStr)
-        if prevSgvDiffStr != None: 
-          wp = lcd.textWidth(prevSgvDiffStr)
-          cleanupX = math.ceil(wp - 30 + (320 - wp) / 2)
-        else:
-          cleanupX = None 
-        x = math.ceil(w - 30 + (320 - w) / 2)
-        printText(sgvDiffStr, x, 215, prevSgvDiffStr, font=lcd.FONT_DejaVu24, backgroundColor=lcd.DARKGREY, rotate=180, textColor=textColor, cleanupX=cleanupX)
-        prevSgvDiffStr = sgvDiffStr
+    #draw dateStr
+    M5.Display.setFont(M5.Display.FONTS.DejaVu24)
+    textColor = WHITE
+    if isOlderThan(sgvDateStr, 10, now): 
+      textColor = RED
+    w = M5.Display.textWidth(dateStr)
+    x = math.ceil((320 - w) / 2)
+    y = 240-24-5
+    printText(dateStr, x, y, font=M5.Display.FONTS.DejaVu24, backgroundColor=DARKGREY, textColor=textColor, rotate=rotate)  
     
-      #draw dateStr
-      if dateStr != prevDateStr:
-        lcd.font(lcd.FONT_DejaVu24)
-        textColor = lcd.WHITE
-        if isOlderThan(sgvDateStr, 10, now): textColor = lcd.RED
-        w = lcd.textWidth(dateStr)
-        x = math.ceil(320 - (320 - w) / 2)
-        y = 24 + 5
-        if prevDateStr != None: 
-          cleanupX = math.ceil(320 - (320 - lcd.textWidth(prevDateStr)) / 2)  
-        else:
-          cleanupX = None  
-        printText(dateStr, x, y, prevDateStr, font=lcd.FONT_DejaVu24, backgroundColor=lcd.DARKGREY, rotate=180, textColor=textColor, cleanupX=cleanupX)  
-        prevDateStr = dateStr
     drawScreenLock.release()
-    print("Printing screen finished in " + str((utime.time() - s)) + " secs ...")
+    print("Printing screen finished in " + str((utime.time() - s)) + " secs ...")  
   else:    
     print("Printing locked!")
 
@@ -617,13 +463,11 @@ def backendMonitor():
   while True:
     try:
       print('Battery level: ' + str(getBatteryLevel()) + '%')
-      print('Free memory: ' + str(gc.mem_free()) + ' bytes')
-      print('Allocated memory: ' + str(gc.mem_alloc()) + ' bytes')
       printTime((utime.time() - startTime), prefix='Uptime is')
       print("Calling backend with timeout " + str(BACKEND_TIMEOUT_MS) + " ms ...")
       s = utime.time()
       backendResponseTimer.init(mode=machine.Timer.ONE_SHOT, period=BACKEND_TIMEOUT_MS+10000, callback=watchdogCallback)
-      backendResponse = urequests.get(API_ENDPOINT + "/entries.json?count=10&waitfornextid=" + str(lastid) + "&timeout=" + str(BACKEND_TIMEOUT_MS), headers={'api-secret': API_TOKEN,'accept-language': LOCALE,'accept-charset': 'ascii', 'x-gms-tz': TIMEZONE})
+      backendResponse = requests2.get(API_ENDPOINT + "/entries.json?count=10&waitfornextid=" + str(lastid) + "&timeout=" + str(BACKEND_TIMEOUT_MS), headers={'api-secret': API_TOKEN,'accept-language': LOCALE,'accept-charset': 'ascii', 'x-gms-tz': TIMEZONE})
       backendResponseTimer.deinit()
       response = backendResponse.json()
       backendResponse.close()
@@ -652,7 +496,7 @@ def backendMonitor():
         if response != None and len(response) >= 1: 
           drawScreen(response[0], noNetwork=True)
         else:
-          printCenteredText("Network error! Please wait.", mode, backgroundColor=lcd.RED, clear=True)
+          printCenteredText("Network error! Please wait.", mode, backgroundColor=RED, clear=True)
       except Exception as e:
         sys.print_exception(e)
         saveError(e)
@@ -662,16 +506,16 @@ def backendMonitor():
 
 def setEmergencyrgbUnitColor(setBeepColorIndex, beepColor):
   setBlackColorIndex = setBeepColorIndex-1
-  if setBlackColorIndex == 0: setBlackColorIndex = 3
+  if setBlackColorIndex == -1: setBlackColorIndex = 2
   #print('Colors: ' + str(setBlackColorIndex) + ' ' + str(setBeepColorIndex))
   if rgbUnit != None:
-    rgbUnit.setColor(setBlackColorIndex, lcd.BLACK)
-    rgbUnit.setColor(setBeepColorIndex, beepColor)
+    rgbUnit.set_color(setBlackColorIndex, BLACK)
+    rgbUnit.set_color(setBeepColorIndex, beepColor)
         
 def emergencyMonitor():
   global emergency, response, rgbUnit, beeperExecuted, EMERGENCY_MAX, EMERGENCY_MIN, OLD_DATA_EMERGENCY
   useBeeper = False
-  setColorIndex = 2
+  set_colorIndex = 1
   
   while True:
     #print('Emergency monitor checking status')
@@ -685,19 +529,18 @@ def emergencyMonitor():
       else:
         print('SGV data is older than ' + str(OLD_DATA_EMERGENCY) + ' minutes!!!')  
       
-      beepColor = lcd.RED
-      if sgv > EMERGENCY_MAX: beepColor = lcd.ORANGE  
+      beepColor = RED
+      if sgv > EMERGENCY_MAX: beepColor = ORANGE  
 
-      setEmergencyrgbUnitColor(setColorIndex, beepColor)
-      setColorIndex += 1
-      if setColorIndex > 3: setColorIndex = 1 
+      setEmergencyrgbUnitColor(set_colorIndex, beepColor)
+      set_colorIndex += 1
+      if set_colorIndex > 2: set_colorIndex = 0 
       if beeperExecuted == False:
         useBeeper = checkBeeper()
       if useBeeper == True:
-        power.setVibrationEnable(True) 
-        power.setVibrationIntensity(50)
+        M5.Power.setVibration(128) #Max 255
         time.sleep(1)
-        power.setVibrationEnable(False)
+        M5.Power.setVibration(0)
         beeperExecuted = True   
         useBeeper = False 
       else:
@@ -707,59 +550,56 @@ def emergencyMonitor():
       #print('No Emergency')
       beeperExecuted = False
       useBeeper = False
-      setColorIndex = 2
+      set_colorIndex = 0
       time.sleep(1)
 
 #accelerator
-def mpuMonitor():
+def accelMonitor():
   while True:
-    mpuAction()
+    accelAction()
     time.sleep(0.5)
 
-def mpuAction():
-  global mpu, mode, response
-  acceleration = mpu.acceleration
+def accelAction():
+  global mode, response
+  acceleration = M5.Imu.getAccel()
   hasResponse = (response != None)
-  if hasResponse and acceleration[1] < -0.1 and mode in range(0,3): mode += 4; drawScreen(response[0], clear=True) #change to 'Flip mode' #4,5,6
-  elif hasResponse and acceleration[1] > 0.1 and mode in range(4,7): mode -= 4; drawScreen(response[0], clear=True) #change to 'Normal mode' #0,1,2
-  elif hasResponse and acceleration[1] < -0.1 and mode == 7: mode = 8; drawScreen(response[0], clear=True)
-  elif hasResponse and acceleration[1] > 0.1 and mode == 8: mode = 7; drawScreen(response[0], clear=True)
-
-def mpuCallback(t):
-  mpuAction()
+  if hasResponse and acceleration[1] < -0.1 and mode in range(0,3): mode += 4; drawScreen(response[0]) #change to 'Flip mode' #4,5,6
+  elif hasResponse and acceleration[1] > 0.1 and mode in range(4,7): mode -= 4; drawScreen(response[0]) #change to 'Normal mode' #0,1,2
+  elif hasResponse and acceleration[1] < -0.1 and mode == 7: mode = 8; drawScreen(response[0])
+  elif hasResponse and acceleration[1] > 0.1 and mode == 8: mode = 7; drawScreen(response[0])
 
 def touchPadCallback(t):
-  if touch.status() == True:
-    t = touch.read()
-    tx = t[0]
-    ty = t[1]
+  M5.update()
+  if M5.Touch.getCount() > 0:
+    tx = M5.Touch.getX()
+    ty = M5.Touch.getY()
     print("Touch screen pressed at " + str(tx) + "," + str(ty))
     if tx >= 120 and tx <= 160 and ty >= 240 and ty <= 280:
-      onBtnBPressed()
+      onBtnBPressed(t)
     elif tx >= 240 and tx <= 280 and ty >= 240 and ty <= 280:
-      onBtnCPressed()  
+      onBtnCPressed(t)  
     else:
-      onBtnPressed()
+      onBtnPressed(t)
 
 def watchdogCallback(t):
   global shuttingDown, backendResponse, rgbUnit, response, mode
 
   print('Restarting due to backend communication failure ...')
   if rgbUnit != None:
-    rgbUnit.setColor(1, lcd.BLACK)
-    rgbUnit.setColor(2, lcd.DARKGREY)
-    rgbUnit.setColor(3, lcd.BLACK)
+    rgbUnit.set_color(0, BLACK)
+    rgbUnit.set_color(1, DARKGREY)
+    rgbUnit.set_color(2, BLACK)
   if backendResponse != None: backendResponse.close()
-  machine.WDT(timeout=1000)   
+  WDT(timeout=1000)   
   shuttingDown = True
-  printCenteredText("Restarting...", mode, backgroundColor=lcd.RED, clear=True)
+  printCenteredText("Restarting...", mode, backgroundColor=RED, clear=True)
 
-def locatimeCallback(t):
-  global shuttingDown, prevTimeStr, mode, secondsDiff 
+def localtimeCallback(t):
+  global shuttingDown, mode, secondsDiff 
   if shuttingDown == False:
-    prevTimeStr = printLocaltime(prevTimeStr, mode, secondsDiff, silent=True)
+    printLocaltime(mode, secondsDiff, silent=True)
 
-def onBtnPressed():
+def onBtnPressed(t):
   print('Button pressed')
   global emergency, emergencyPause
   if emergency == True:
@@ -768,23 +608,22 @@ def onBtnPressed():
   else:   
     global brightness, config
     brightness += 32
-    if brightness > 128: brightness = 32
-    screen = M5Screen()
-    screen.set_screen_brightness(brightness)
+    if brightness > 255: brightness = 32
+    M5.Widgets.setBrightness(brightness)
     config["brightness"] = brightness
     saveConfigFile()
 
-def onBtnBPressed():
+def onBtnBPressed(t):
   global shuttingDown, mode, config
   print('Button B pressed')
   config[ap.CONFIG] = 0
   saveConfigFile()
-  machine.WDT(timeout=1000)
+  WDT(timeout=1000)
   shuttingDown = True
-  printCenteredText("Restarting...", mode, backgroundColor=lcd.RED, clear=True)  
+  printCenteredText("Restarting...", mode, backgroundColor=RED, clear=True)  
 
-def onBtnCPressed():
-  onBtnPressed()
+def onBtnCPressed(t):
+  onBtnPressed(t)
 
 # main app code -------------------------------------------------------------------     
 
@@ -798,47 +637,39 @@ except Exception as e:
    sys.print_exception(e)
 
 mode = 0
-mpu = IMU()
-if mpu.acceleration[1] < 0: mode = 4 #flip
+if M5.Imu.getAccel()[1] < 0: mode = 4 #flip
+
+M5.begin()
 
 brightness = 32
 if config != None: brightness = config["brightness"]
-screen = M5Screen()
-screen.set_screen_brightness(brightness)
+M5.Widgets.setBrightness(brightness)
 
-lcd.clear(lcd.DARKGREY)
-printCenteredText("Starting...", mode, backgroundColor=lcd.DARKGREY, clear=True)  
+printCenteredText("Starting...", mode, backgroundColor=DARKGREY, clear=True)  
 
 envUnit = None
 try: 
-  envUnit = unit.get(unit.ENV3, unit.PORTA)
-  print('Temperature:',str(envUnit.temperature) + " C")
-  print('Humidity:',str(envUnit.humidity) + " %")
-  print('Pressure:',str(envUnit.pressure) + " hPa")
+   i2c0 = I2C(0, scl=Pin(33), sda=Pin(32), freq=40000)
+   envUnit = ENVUnit(i2c=i2c0, type=3) 
+   print('Temperature:',str(envUnit.read_temperature()) + " C")
+   print('Humidity:',str(envUnit.read_humidity()) + " %")
+   print('Pressure:',str(envUnit.read_pressure()) + " hPa")
 except Exception as e:
-  print('Weather Monitoring Unit not found')
-  #sys.print_exception(e)
+   print('Weather Monitoring Unit not found')
+   sys.print_exception(e)
 
 rgbUnit = None
 try: 
-  rgbUnit = unit.get(unit.RGB, unit.PORTA)
-  rgbUnit.setColor(1, lcd.BLACK)     
-  rgbUnit.setColor(2, lcd.DARKGREY)
-  rgbUnit.setColor(3, lcd.BLACK)
+   rgbUnit = RGBUnit((36, 26), 3)
+   rgbUnit.set_color(0, BLACK)     
+   rgbUnit.set_color(1, DARKGREY)
+   rgbUnit.set_color(2, BLACK)
 except Exception as e:
-  print('RGB Unit not found')
-  #sys.print_exception(e)
+   print('RGB Unit not found')
+   sys.print_exception(e)
 
 print('Starting ...')
-print('APIKEY:', deviceCfg.get_apikey())
-print('Board name:', deviceCfg.get_board_name())
 print('System:', sys.implementation)
-macaddr=wifiCfg.wlan_sta.config('mac')
-macaddr='{:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}'.format(*macaddr)
-print('MAC Adddress:', macaddr)
-print('Free memory:', str(gc.mem_free()) + ' bytes')
-machine_id = binascii.hexlify(machine.unique_id())
-print('Machine unique id:', machine_id.decode())
 
 response = None
 emergency = False
@@ -847,28 +678,17 @@ shuttingDown = False
 backendResponse = None
 beeperExecuted = False
   
-headerColor = None
-middleColor = None
-footerColor = None
-prevX = None
-prevY = None
-prevDirectionStr = None
-prevDateStr = None 
-prevSgvDiffStr = None
-prevBatteryStr = None 
-prevTimeStr = None 
-prevSgvStr = None
 batteryStrIndex = 0
 
 if config == None or config[ap.CONFIG] == 0:
-   printCenteredText("Connect AP ...", mode, backgroundColor=lcd.RED, clear=True)
+   printCenteredText("Connect AP ...", mode, backgroundColor=RED, clear=True)
    print("Connect wifi " + ap.SSID)
    def reboot():
       global shuttingDown 
       print('Restarting after configuration change...')
-      machine.WDT(timeout=1000)   
+      WDT(timeout=1000)   
       shuttingDown = True
-      printCenteredText("Restarting...", mode, backgroundColor=lcd.RED, clear=True)   
+      printCenteredText("Restarting...", mode, backgroundColor=RED, clear=True)   
    ap.open_access_point(reboot)  
 else:
    try: 
@@ -906,92 +726,92 @@ else:
      saveError(e)
      config[ap.CONFIG] = 0
      saveConfigFile()
-     printCenteredText("Fix config!", mode, backgroundColor=lcd.RED, clear=True)
+     printCenteredText("Fix config!", mode, backgroundColor=RED, clear=True)
      time.sleep(2)
-     machine.WDT(timeout=1000)
+     WDT(timeout=1000)
      shuttingDown = True
-     printCenteredText("Restarting...", mode, backgroundColor=lcd.RED, clear=True)
+     printCenteredText("Restarting...", mode, backgroundColor=RED, clear=True)
 
 # activate buttons to enable configuration changes     
-  
-btnA.wasPressed(onBtnPressed)
-btnB.wasPressed(onBtnBPressed)
-btnC.wasPressed(onBtnCPressed)
 
-# from here code runs only if application is properly configured
-
-nic = network.WLAN(network.STA_IF)
-nic.active(True)
-
-printCenteredText("Scanning wifi ...", mode, backgroundColor=lcd.DARKGREY)
-
-wifi_password = None
-wifi_ssid = None
-while wifi_password == None:
-  try: 
-    nets = nic.scan()
-    for result in nets:
-      wifi_ssid = result[0].decode() 
-      if wifi_ssid in config: 
-        wifi_password = config[wifi_ssid]
-      else:
-        print('No password for wifi ' + wifi_ssid + ' found')  
-      if wifi_password != None: break
-  except Exception as e:
-      sys.print_exception(e)
-      saveError(e)
-      printCenteredText("Wifi not found!", mode, backgroundColor=lcd.RED, clear=True)  
-  if wifi_password == None: time.sleep(1)
-
-printCenteredText("Connecting wifi...", mode, backgroundColor=lcd.DARKGREY) #lcd.OLIVE)
-nic.connect(wifi_ssid, wifi_password)
-print('Connecting wifi ' + wifi_ssid)
-while not nic.isconnected():
-  print(".", end="")
-  time.sleep(0.25)
-print("")  
-
-time_server = 'pool.ntp.org'
-printCenteredText("Setting time...", mode, backgroundColor=lcd.DARKGREY) #lcd.GREENYELLOW)
-print('Connecting time server ' + time_server)
-now_datetime = None
-while now_datetime is None:
-  try:
-    print(".", end="")
-    #TODO use 0.pool.ntp.org, 1.pool.ntp.org, 2.pool.ntp.org, 3.pool.ntp.org
-    rtc.settime('ntp', host=time_server, tzone=1) #UTC = GMT+0
-    now_datetime = getRtcDatetime()
-    startTime = utime.time()
-  except Exception as e:
-    sys.print_exception(e)
-    #saveError(e)
-    time.sleep(2)
-print("\nCurrent UTC datetime " +  str(now_datetime))
-
-printCenteredText("Loading data...", mode, backgroundColor=lcd.DARKGREY) #lcd.DARKGREEN)
-
-sgvDict = readSgvFile()
-dictLen = len(sgvDict)
-print("Loaded " + str(dictLen) + " sgv entries")
-
-#max 4 timers 0-3
+M5.BtnA.setCallback(type=M5.BtnA.CB_TYPE.WAS_PRESSED, cb=onBtnPressed)
+M5.BtnB.setCallback(type=M5.BtnB.CB_TYPE.WAS_PRESSED, cb=onBtnBPressed)
+M5.BtnC.setCallback(type=M5.BtnC.CB_TYPE.WAS_PRESSED, cb=onBtnCPressed)
 
 touchPadTimer = machine.Timer(0)
 touchPadTimer.init(period=100, callback=touchPadCallback)
 
-backendResponseTimer = machine.Timer(1)
+# from here code runs only if application is properly configured
+
+try:
+  nic = network.WLAN(network.STA_IF)
+  nic.active(True)
+
+  printCenteredText("Scanning wifi ...", mode, backgroundColor=DARKGREY)
+
+  wifi_password = None
+  wifi_ssid = None  
+  while wifi_password == None:
+    try: 
+      nets = nic.scan()
+      for result in nets:
+        wifi_ssid = result[0].decode() 
+        if wifi_ssid in config: 
+          wifi_password = config[wifi_ssid]
+        else:
+          print('No password for wifi ' + wifi_ssid + ' found')  
+        if wifi_password != None: break
+    except Exception as e:
+      sys.print_exception(e)
+      saveError(e)
+      printCenteredText("Wifi not found!", mode, backgroundColor=RED, clear=True)  
+    if wifi_password == None: time.sleep(1)
+
+  printCenteredText("Connecting wifi...", mode, backgroundColor=DARKGREY) 
+  nic.connect(wifi_ssid, wifi_password)
+  print('Connecting wifi ' + wifi_ssid)
+  while not nic.isconnected():
+    print(".", end="")
+    time.sleep(0.25)
+  print("")  
+
+  time_server = 'pool.ntp.org'
+  printCenteredText("Setting time...", mode, backgroundColor=DARKGREY) 
+  print('Connecting time server ' + time_server)
+  now_datetime = None
+  while now_datetime is None:
+    try:
+      print(".", end="")
+      #TODO use 0.pool.ntp.org, 1.pool.ntp.org, 2.pool.ntp.org, 3.pool.ntp.org
+      ntptime.host = "pool.ntp.org" 
+      ntptime.settime()
+      now_datetime = getRtcDatetime()
+      startTime = utime.time()
+    except Exception as e:
+      sys.print_exception(e)
+      #saveError(e)
+      time.sleep(2)
+  print("\nCurrent UTC datetime " +  str(now_datetime))
+
+  printCenteredText("Loading data...", mode, backgroundColor=DARKGREY) 
+
+  sgvDict = readSgvFile()
+  dictLen = len(sgvDict)
+  print("Loaded " + str(dictLen) + " sgv entries")
+
+  #max 4 timers 0-3
+
+  backendResponseTimer = machine.Timer(1)
   
-localtimeTimer = machine.Timer(2)
-localtimeTimer.init(period=1000, callback=locatimeCallback)
+  localtimeTimer = machine.Timer(2)
+  localtimeTimer.init(period=1000, callback=localtimeCallback)
 
-#using mpuMonitor thread instead
-#mpuTimer = machine.Timer(3)
-#mpuTimer.init(period=500, callback=mpuCallback)
+  #main method and threads
 
-#main method and threads
-
-#_thread.start_new_thread(backendMonitor, ())
-_thread.start_new_thread(emergencyMonitor, ())
-_thread.start_new_thread(mpuMonitor, ())
-
-backendMonitor()
+  _thread.start_new_thread(emergencyMonitor, ())
+  _thread.start_new_thread(accelMonitor, ())
+  _thread.start_new_thread(backendMonitor(), ())
+except:
+  sys.print_exception(e)
+  #saveError(e)
+  printCenteredText("Fix config!", mode, backgroundColor=RED, clear=True)
