@@ -59,16 +59,6 @@ def printTime(seconds, prefix='', suffix=''):
   h, m = divmod(m, 60)
   print(prefix + ' {:02d}:{:02d}:{:02d} '.format(h, m, s) + suffix)  
 
-def saveConfigFile():
-  global config
-  try:
-    with open(ap.CONFIG_FILE, 'w') as confFile:
-      ujson.dump(config, confFile) 
-    print("Successfully saved config file")
-  except Exception as e:
-    sys.print_exception(e) 
-    saveError(e)
- 
 def saveResponseFile():
   global response
   with open(RESPONSE_FILE, 'w') as responseFile:
@@ -571,15 +561,18 @@ def accelAction():
 def touchPadCallback(t):
   M5.update()
   if M5.Touch.getCount() > 0:
-    tx = M5.Touch.getX()
-    ty = M5.Touch.getY()
-    print("Touch screen pressed at " + str(tx) + "," + str(ty))
-    if tx >= 120 and tx <= 160 and ty >= 240 and ty <= 280:
-      onBtnBPressed(t)
-    elif tx >= 240 and tx <= 280 and ty >= 240 and ty <= 280:
-      onBtnCPressed(t)  
-    else:
-      onBtnPressed(t)
+    td = M5.Touch.getDetail(0)
+    #print(td)
+    if td[4] == True:
+      tx = M5.Touch.getX()
+      ty = M5.Touch.getY()
+      print("Touch screen pressed at " + str(tx) + "," + str(ty))
+      if tx >= 120 and tx <= 160 and ty >= 240 and ty <= 280:
+        onBtnBPressed(t)
+      elif tx >= 240 and tx <= 280 and ty >= 240 and ty <= 280:
+        onBtnCPressed(t)  
+      else:
+        onBtnPressed(t)
 
 def watchdogCallback(t):
   global shuttingDown, backendResponse, rgbUnit, response, mode
@@ -611,13 +604,13 @@ def onBtnPressed(t):
     if brightness > 255: brightness = 32
     M5.Widgets.setBrightness(brightness)
     config["brightness"] = brightness
-    saveConfigFile()
+    ap.saveConfigFile(config)
 
 def onBtnBPressed(t):
   global shuttingDown, mode, config
   print('Button B pressed')
   config[ap.CONFIG] = 0
-  saveConfigFile()
+  ap.saveConfigFile(config)
   WDT(timeout=1000)
   shuttingDown = True
   printCenteredText("Restarting...", mode, backgroundColor=RED, clear=True)  
@@ -627,14 +620,7 @@ def onBtnCPressed(t):
 
 # main app code -------------------------------------------------------------------     
 
-config = None
-
-try:
-   os.stat(ap.CONFIG_FILE)
-   confFile = open(ap.CONFIG_FILE, 'r')
-   config = ujson.loads(confFile.read())
-except Exception as e:
-   sys.print_exception(e)
+config = ap.readConfigFile()
 
 mode = 0
 if M5.Imu.getAccel()[1] < 0: mode = 4 #flip
@@ -725,7 +711,7 @@ else:
      sys.print_exception(e)
      saveError(e)
      config[ap.CONFIG] = 0
-     saveConfigFile()
+     ap.saveConfigFile(config)
      printCenteredText("Fix config!", mode, backgroundColor=RED, clear=True)
      time.sleep(2)
      WDT(timeout=1000)

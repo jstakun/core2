@@ -7,6 +7,8 @@ import esp
 esp.osdebug(None)
 import uos
 import ujson
+import sys
+import os
 
 SSID = 'AP-M5DiabConf'
 PASSWORD = '123456789'
@@ -14,6 +16,22 @@ CONFIG = 'config'
 CONFIG_FILE = 'config.json'
 
 ipconfig = None
+
+def saveConfigFile(config):
+  try:
+    with open(CONFIG_FILE, 'w') as confFile:
+      ujson.dump(config, confFile) 
+    print("Successfully saved config file")
+  except Exception as e:
+    sys.print_exception(e) 
+
+def readConfigFile():
+  try:
+    os.stat(CONFIG_FILE)
+    confFile = open(CONFIG_FILE, 'r')
+    return ujson.loads(confFile.read())
+  except Exception as e:
+    sys.print_exception(e)     
 
 def randstr(length=20):
     source = 'abcdefghijklmnopqrstuvwxyz1234567890'
@@ -72,6 +90,8 @@ def open_access_point(successCallback):
   configHtml = readHtmlFile('config.html')
   successHtml = readHtmlFile('success.html')
 
+  #TODO populate config.html with values from config.json
+
   print('Web server is running on port 80')
 
   while True:
@@ -109,8 +129,7 @@ def open_access_point(successCallback):
       print("Saved config parameter " + wifi_ssid)
       config[CONFIG] = 1
       config["brightness"] = 32
-      with open(CONFIG_FILE, 'w') as confFile:
-        ujson.dump(config, confFile)   
+      saveConfigFile(config)   
       
       successCallback()
       conn.send(successHtml)   
