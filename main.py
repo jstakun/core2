@@ -405,9 +405,11 @@ def drawScreen(newestEntry, noNetwork=False):
     
     M5.Display.setRotation(rotate)  
 
-    M5.Display.fillRect(0, 0, SCREEN_WIDTH, 44, LIGHTGREY)
-    M5.Display.fillRect(0, 44, SCREEN_WIDTH, 158, backgroundColor)
-    M5.Display.fillRect(0, SCREEN_HEIGHT-44, SCREEN_WIDTH, 44, LIGHTGREY)
+    w = math.ceil(SCREEN_HEIGHT/5)
+
+    M5.Display.fillRect(0, 0, SCREEN_WIDTH, w, LIGHTGREY)
+    M5.Display.fillRect(0, w, SCREEN_WIDTH, 3*w, backgroundColor)
+    M5.Display.fillRect(0, SCREEN_HEIGHT-w, SCREEN_WIDTH, w, LIGHTGREY)
 
     #draw current time
     printLocaltime(mode, secondsDiff, useLock=True)  
@@ -415,7 +417,7 @@ def drawScreen(newestEntry, noNetwork=False):
     #draw sgv
     M5.Display.setFont(M5.Display.FONTS.DejaVu72) 
     w = M5.Display.textWidth(sgvStr)
-    x = math.ceil((SCREEN_WIDTH - w - 30 - 80) / 2)
+    x = math.ceil((SCREEN_WIDTH - w - 130) / 2)
     f = M5.Display.fontHeight()
     y = math.ceil((SCREEN_HEIGHT - f) / 2)
     printText(sgvStr, x, y, font=M5.Display.FONTS.DejaVu72, backgroundColor=backgroundColor, rotate=rotate)

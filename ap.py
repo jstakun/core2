@@ -125,6 +125,7 @@ def open_access_point(successCallback):
         if k != 'ssid' and k != 'wifi_password':
           config[k] = value
           print("Saved config parameter " + k)
+      #Encode wifi password
       config[wifi_ssid] = wifi_password
       print("Saved config parameter " + wifi_ssid)
       config[CONFIG] = 1
