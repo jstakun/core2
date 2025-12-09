@@ -197,8 +197,8 @@ def printCenteredText(msg, mode, font=M5.Display.FONTS.DejaVu24, backgroundColor
     
   w = M5.Display.textWidth(msg)
   f = M5.Display.fontHeight()
-  x = math.ceil((SCREEN_WIDTH-w)/2)
-  y = math.ceil((SCREEN_HEIGHT-f)/2)
+  x = int((SCREEN_WIDTH-w)/2)
+  y = int((SCREEN_HEIGHT-f)/2)
 
   M5.Display.drawString(msg, x, y)
 
@@ -281,7 +281,7 @@ def printLocaltime(mode, secondsDiff, localtime=None, useLock=False, silent=Fals
       rotate = 1
       if mode >= 4:
         rotate = 3
-      printText(timeStr, 10, 10, backgroundColor=LIGHTGREY, silent=silent, rotate=rotate)  
+      printText(timeStr, 10, 12, backgroundColor=LIGHTGREY, silent=silent, rotate=rotate)  
       if useLock == False and locked == True:
         drawScreenLock.release()
   except Exception as e:
@@ -405,7 +405,7 @@ def drawScreen(newestEntry, noNetwork=False):
     
     M5.Display.setRotation(rotate)  
 
-    w = math.ceil(SCREEN_HEIGHT/5)
+    w = int(SCREEN_HEIGHT/5)
 
     M5.Display.fillRect(0, 0, SCREEN_WIDTH, w, LIGHTGREY)
     M5.Display.fillRect(0, w, SCREEN_WIDTH, 3*w, backgroundColor)
@@ -417,14 +417,14 @@ def drawScreen(newestEntry, noNetwork=False):
     #draw sgv
     M5.Display.setFont(M5.Display.FONTS.DejaVu72) 
     w = M5.Display.textWidth(sgvStr)
-    x = math.ceil((SCREEN_WIDTH - w - 130) / 2)
+    x = int((SCREEN_WIDTH - w - 130) / 2)
     f = M5.Display.fontHeight()
-    y = math.ceil((SCREEN_HEIGHT - f) / 2)
+    y = int((SCREEN_HEIGHT - f) / 2)
     printText(sgvStr, x, y, font=M5.Display.FONTS.DejaVu72, backgroundColor=backgroundColor, rotate=rotate)
     
     #draw arrow
-    x += math.ceil(w) + 70
-    y = math.ceil(SCREEN_HEIGHT / 2)
+    x += int(w) + 70
+    y = int(SCREEN_HEIGHT / 2)
         
     if directionStr == 'DoubleUp': drawDirectionV2(x, y, tri_color=arrowColor, ydiff=8)
     elif directionStr == 'DoubleDown': drawDirectionV2(x, y, angle_degrees=180, tri_color=arrowColor, ydiff=8) 
@@ -438,14 +438,14 @@ def drawScreen(newestEntry, noNetwork=False):
     M5.Display.setFont(M5.Display.FONTS.DejaVu24)
     textColor = batteryTextColor
     w = M5.Display.textWidth(batteryStr)
-    printText(batteryStr, math.ceil(SCREEN_WIDTH - w - 10), 10, font=M5.Display.FONTS.DejaVu24, backgroundColor=LIGHTGREY, textColor=textColor, rotate=rotate) 
+    printText(batteryStr, int(SCREEN_WIDTH - w - 10), 12, font=M5.Display.FONTS.DejaVu24, backgroundColor=LIGHTGREY, textColor=textColor, rotate=rotate) 
     
     #draw sgv diff
     textColor = WHITE
     if math.fabs(sgvDiff) >= 10 and backgroundColor != RED and not tooOld: textColor = RED
     w = M5.Display.textWidth(sgvDiffStr)
-    x = math.ceil(25 + (SCREEN_WIDTH - w) / 2)
-    printText(sgvDiffStr, x, 10, font=M5.Display.FONTS.DejaVu24, backgroundColor=LIGHTGREY, textColor=textColor, rotate=rotate)
+    x = int(25 + (SCREEN_WIDTH - w) / 2)
+    printText(sgvDiffStr, x, 12, font=M5.Display.FONTS.DejaVu24, backgroundColor=LIGHTGREY, textColor=textColor, rotate=rotate)
     
     #draw dateStr
     M5.Display.setFont(M5.Display.FONTS.DejaVu24)
@@ -453,8 +453,8 @@ def drawScreen(newestEntry, noNetwork=False):
     if isOlderThan(sgvDateStr, 10, now): 
       textColor = RED
     w = M5.Display.textWidth(dateStr)
-    x = math.ceil((SCREEN_WIDTH - w) / 2)
-    y = SCREEN_HEIGHT-24-10
+    x = int((SCREEN_WIDTH - w) / 2)
+    y = SCREEN_HEIGHT-24-12
     printText(dateStr, x, y, font=M5.Display.FONTS.DejaVu24, backgroundColor=LIGHTGREY, textColor=textColor, rotate=rotate)  
     
     drawScreenLock.release()
@@ -546,12 +546,16 @@ def emergencyMonitor():
         useBeeper = checkBeeper()
       if useBeeper == True:
         M5.Power.setVibration(128) #Max 255
+        M5.Power.setLed(255)
         time.sleep(1)
         M5.Power.setVibration(0)
+        M5.Power.setLed(0)
         beeperExecuted = True   
         useBeeper = False 
       else:
+        M5.Power.setLed(255)
         time.sleep(1)
+        M5.Power.setLed(0)
       print("beeperExecuted=" + str(beeperExecuted) + ", useBeeper=" + str(useBeeper))              
     else:
       #print('No Emergency')
@@ -647,6 +651,7 @@ M5.begin()
 brightness = 32
 if config != None: brightness = config["brightness"]
 M5.Widgets.setBrightness(brightness)
+M5.Power.setLed(0)
 
 printCenteredText("Starting...", mode, backgroundColor=LIGHTGREY, clear=True)  
 
