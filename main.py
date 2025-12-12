@@ -191,13 +191,14 @@ def printCenteredText(msg, mode, font=M5.Display.FONTS.DejaVu24, backgroundColor
 
   M5.Display.drawString(msg, x, y)
 
-def printText(msg, x, y, font=M5.Display.FONTS.DejaVu24, backgroundColor=M5.Display.COLOR.BLACK, textColor=M5.Display.COLOR.WHITE, clear=False, rotate=1, silent=False):
+def printText(msg, x, y, font=None, backgroundColor=M5.Display.COLOR.BLACK, textColor=M5.Display.COLOR.WHITE, clear=False, rotate=1, silent=False):
   M5.Display.setRotation(rotate)  
     
   if clear:
     M5.Display.clear(backgroundColor)
         
-  M5.Display.setFont(font)
+  if font != None:       
+    M5.Display.setFont(font)
     
   M5.Display.setTextColor(textColor, backgroundColor)
     
@@ -270,7 +271,7 @@ def printLocaltime(mode, secondsDiff, localtime=None, useLock=False, silent=Fals
       rotate = 1
       if mode >= 4:
         rotate = 3
-      printText(timeStr, 10, 12, backgroundColor=M5.Display.COLOR.DARKGREY, silent=silent, rotate=rotate)  
+      printText(timeStr, 10, 12, font=M5.Display.FONTS.DejaVu24, backgroundColor=M5.Display.COLOR.DARKGREY, silent=silent, rotate=rotate)  
       if useLock == False and locked == True:
         drawScreenLock.release()
   except Exception as e:
@@ -404,15 +405,23 @@ def drawScreen(newestEntry, noNetwork=False):
     printLocaltime(mode, secondsDiff, useLock=True)  
  
     #draw sgv
-    M5.Display.setFont(M5.Display.FONTS.DejaVu72) 
+    gap = 10 #between sgv and arrow
+    radius = 48 #arrow circle 
+    M5.Display.setFont(M5.Display.FONTS.DejaVu40)  
+    M5.Display.setTextSize(2.5)
     w = M5.Display.textWidth(sgvStr)
-    x = int((SCREEN_WIDTH - w - 130) / 2)
+    group_width = w + gap + (radius * 2) #(Text + Gap + Circle Diameter)
+    x = int((SCREEN_WIDTH - group_width) / 2)
+    if x > 25:
+      x -= 10
+      gap += 10     
     f = M5.Display.fontHeight()
-    y = int((SCREEN_HEIGHT - f) / 2)
-    printText(sgvStr, x, y, font=M5.Display.FONTS.DejaVu72, backgroundColor=backgroundColor, rotate=rotate)
+    y = int((SCREEN_HEIGHT - f) / 2) + 10
+    printText(sgvStr, x, y, backgroundColor=backgroundColor, rotate=rotate)
+    M5.Display.setTextSize(1)
     
     #draw arrow
-    x += int(w) + 70
+    x += w + gap + radius
     y = int(SCREEN_HEIGHT / 2)
         
     if directionStr == 'DoubleUp': drawDirectionV2(x, y, tri_color=arrowColor, ydiff=8)
@@ -501,11 +510,11 @@ def backendMonitor():
     print('---------------------------')
 
 def setEmergencyrgbUnitColor(setBeepColorIndex, beepColor):
-  setM5.Display.COLOR.BLACKColorIndex = setBeepColorIndex-1
-  if setM5.Display.COLOR.BLACKColorIndex == -1: setM5.Display.COLOR.BLACKColorIndex = 2
-  #print('Colors: ' + str(setM5.Display.COLOR.BLACKColorIndex) + ' ' + str(setBeepColorIndex))
+  setBlackColorIndex = setBeepColorIndex-1
+  if setBlackColorIndex == -1: setBlackColorIndex = 2
+  #print('Colors: ' + str(setBlackColorIndex) + ' ' + str(setBeepColorIndex))
   if rgbUnit != None:
-    rgbUnit.set_color(setM5.Display.COLOR.BLACKColorIndex, M5.Display.COLOR.BLACK)
+    rgbUnit.set_color(setBlackColorIndex, M5.Display.COLOR.BLACK)
     rgbUnit.set_color(setBeepColorIndex, beepColor)
         
 def emergencyMonitor():
